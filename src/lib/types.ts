@@ -1,3 +1,4 @@
+
 export interface Job {
   id: string;
   name: string;
@@ -23,7 +24,7 @@ export interface Session {
   laborCost: number; // calculated by function
 }
 
-export interface Material {
+export interface JobMaterial {
   id: string; // This will be the document id in the subcollection
   sku: string; // From materials catalog
   name: string;
@@ -34,9 +35,10 @@ export interface Material {
 
 export interface MaterialCatalogItem {
     id: string; // SKU
+    sku: string;
     name: string;
     unit: string;
-    unitCost: number;
+    cost: number;
     description?: string;
     isActive: boolean;
 }
@@ -52,10 +54,10 @@ export interface User {
 export interface TaskType {
   id:string;
   name: string;
-  unitLabel: string;
+  unitLabel?: string;
   defaultLaborRate?: number;
   defaultOverheadPct?: number;
-  isActive: boolean;
+  isActive?: boolean;
 }
 
 export interface OrganizationRates {

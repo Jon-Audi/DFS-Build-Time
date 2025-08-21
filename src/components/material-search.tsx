@@ -5,7 +5,7 @@ import { useState } from "react";
 import { runFlow } from "@genkit-ai/next/client";
 import { enhanceMaterialSearch } from "@/ai/flows/enhance-material-search";
 import { suggestMaterials } from "@/ai/flows/suggest-materials";
-import type { Material } from "@/lib/types";
+import type { MaterialCatalogItem } from "@/lib/types";
 import { mockMaterials, mockTaskTypes } from "@/lib/data";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import { Label } from "./ui/label";
 
 export function MaterialSearch() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [materials, setMaterials] = useState<Material[]>(mockMaterials);
+  const [materials, setMaterials] = useState<MaterialCatalogItem[]>(mockMaterials);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
