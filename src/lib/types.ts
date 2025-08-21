@@ -13,33 +13,54 @@ export interface Session {
   id: string;
   jobId: string;
   userId: string;
-  taskType: string;
-  startTime: Date;
-  endTime: Date | null;
-  duration: number; // in seconds
-  units: number;
+  taskTypeId: string;
+  startedAt: Date;
+  stoppedAt: Date | null;
+  durationSec: number; // calculated by function
+  unitsCompleted: number;
   notes: string;
   photos: string[];
+  laborCost: number; // calculated by function
 }
 
 export interface Material {
-  id: string;
+  id: string; // This will be the document id in the subcollection
+  sku: string; // From materials catalog
   name: string;
-  cost: number;
-  unit: string;
+  unitCost: number;
+  quantity: number;
+  subtotal: number; // calculated by function
+}
+
+export interface MaterialCatalogItem {
+    id: string; // SKU
+    name: string;
+    unit: string;
+    unitCost: number;
+    description?: string;
+    isActive: boolean;
 }
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Yard Staff' | 'Welder';
+  role: 'Admin' | 'Yard Staff' | 'Welder' | 'Supervisor' | 'Worker';
   rate: number; // hourly rate
 }
 
 export interface TaskType {
-  id: string;
+  id:string;
   name: string;
+  unitLabel: string;
+  defaultLaborRate?: number;
+  defaultOverheadPct?: number;
+  isActive: boolean;
+}
+
+export interface OrganizationRates {
+    defaultLaborRate: number;
+    defaultOverheadPct: number;
 }
 
 export interface Report {
