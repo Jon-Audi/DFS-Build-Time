@@ -1,8 +1,10 @@
+
 "use client";
 
 import { useState } from "react";
-import { useFlow } from "@genkit-ai/next/client";
-import { enhanceMaterialSearch, suggestMaterials } from "@/ai/flows";
+import { runFlow } from "@genkit-ai/next/client";
+import { enhanceMaterialSearch } from "@/ai/flows/enhance-material-search";
+import { suggestMaterials } from "@/ai/flows/suggest-materials";
 import type { Material } from "@/lib/types";
 import { mockMaterials, mockTaskTypes } from "@/lib/data";
 
@@ -37,13 +39,10 @@ export function MaterialSearch() {
 
   const [selectedTask, setSelectedTask] = useState<string>(mockTaskTypes[0].name);
 
-  const enhanceSearchFlow = useFlow(enhanceMaterialSearch);
-  const suggestMaterialsFlow = useFlow(suggestMaterials);
-
   const handleSearch = async (term: string) => {
     setLoading(true);
     try {
-      const { enhancedSearchTerm } = await enhanceSearchFlow({
+      const { enhancedSearchTerm } = await runFlow(enhanceMaterialSearch, {
         searchTerm: term,
         taskType: selectedTask,
         materialsPreviouslyUsed: "6ft Cedar Picket, 8ft Pressure-Treated Post 4x4",
@@ -71,7 +70,7 @@ export function MaterialSearch() {
   const handleSuggest = async () => {
     setLoading(true);
     try {
-      const { suggestedMaterials: suggestions } = await suggestMaterialsFlow({
+      const { suggestedMaterials: suggestions } = await runFlow(suggestMaterials, {
         jobDescription: "Installing a 6ft tall privacy fence in a residential backyard with rocky soil.",
         taskType: selectedTask,
         previouslyUsedMaterials: ["6ft Cedar Picket", "8ft Cedar Rail 2x4"]
