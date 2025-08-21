@@ -31,13 +31,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { mockUsers, mockTaskTypes, mockMaterials } from "@/lib/data"
 import { PlusCircle, Trash2, FileUp, FileDown, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import type { TaskType } from "@/lib/types"
+import type { TaskType, User, MaterialCatalogItem } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function AdminPage() {
+  const [users, setUsers] = React.useState<User[]>([]);
+  const [taskTypes, setTaskTypes] = React.useState<TaskType[]>([]);
+  const [materials, setMaterials] = React.useState<MaterialCatalogItem[]>([]);
+
   const formatCurrency = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
   const [selectedTask, setSelectedTask] = React.useState<TaskType | null>(null)
   const [isTaskDialogOpen, setIsTaskDialogOpen] = React.useState(false)
@@ -78,7 +81,7 @@ export default function AdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {mockUsers.map((user) => (
+                      {users.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell>{user.email}</TableCell>
@@ -91,6 +94,11 @@ export default function AdminPage() {
                           </TableCell>
                         </TableRow>
                       ))}
+                        {users.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center h-24">No users found.</TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                   </Table>
                 </div>
@@ -111,12 +119,11 @@ export default function AdminPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="default-labor">Default Labor Rate ($/hr)</Label>
-                    <Input id="default-labor" type="number" placeholder="28" defaultValue="28" />
-                    <p className="text-sm text-muted-foreground">Default hourly rate for new workers.</p>
+                    <Input id="default-labor" type="number" placeholder="Enter rate" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="overhead-percentage">Default Overhead (%)</Label>
-                    <Input id="overhead-percentage" type="number" placeholder="20" defaultValue="20" />
+                    <Input id="overhead-percentage" type="number" placeholder="Enter percentage" />
                     <p className="text-sm text-muted-foreground">Percentage added to jobs for overhead costs.</p>
                   </div>
                 </div>
@@ -144,7 +151,7 @@ export default function AdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {mockTaskTypes.map((task) => (
+                      {taskTypes.map((task) => (
                         <TableRow key={task.id} onClick={() => handleTaskRowClick(task)} className="cursor-pointer">
                           <TableCell className="font-medium">{task.name}</TableCell>
                           <TableCell>{task.defaultMaterials?.length ?? 0} items</TableCell>
@@ -155,6 +162,11 @@ export default function AdminPage() {
                           </TableCell>
                         </TableRow>
                       ))}
+                       {taskTypes.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={3} className="text-center h-24">No task types found.</TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                   </Table>
                 </div>
@@ -193,7 +205,7 @@ export default function AdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {mockMaterials.map((material) => (
+                      {materials.map((material) => (
                         <TableRow key={material.id}>
                           <TableCell className="font-mono">{material.sku}</TableCell>
                           <TableCell className="font-medium">{material.name}</TableCell>
@@ -211,6 +223,11 @@ export default function AdminPage() {
                           </TableCell>
                         </TableRow>
                       ))}
+                      {materials.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center h-24">No materials found.</TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                   </Table>
                 </div>
@@ -232,7 +249,7 @@ export default function AdminPage() {
           <div className="py-4 space-y-6">
             <div className="space-y-2">
               <Label htmlFor="task-name">Task Name</Label>
-              <Input id="task-name" value={selectedTask?.name} />
+              <Input id="task-name" value={selectedTask?.name ?? ""} onChange={(e) => setSelectedTask(prev => prev ? {...prev, name: e.target.value} : null)} />
             </div>
             
             <div className="space-y-4">
@@ -245,7 +262,7 @@ export default function AdminPage() {
                         <SelectValue placeholder="Select a material to add" />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockMaterials.map(m => (
+                        {materials.map(m => (
                           <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -269,7 +286,7 @@ export default function AdminPage() {
                   </TableHeader>
                   <TableBody>
                     {selectedTask?.defaultMaterials?.map(dm => {
-                       const material = mockMaterials.find(m => m.sku === dm.sku);
+                       const material = materials.find(m => m.sku === dm.sku);
                        return (
                          <TableRow key={dm.sku}>
                            <TableCell className="font-medium">{material?.name ?? 'Unknown'}</TableCell>
@@ -282,7 +299,7 @@ export default function AdminPage() {
                          </TableRow>
                        );
                     })}
-                    {!selectedTask?.defaultMaterials?.length && (
+                    {(!selectedTask?.defaultMaterials || selectedTask.defaultMaterials.length === 0) && (
                        <TableRow>
                          <TableCell colSpan={3} className="text-center h-24">No materials associated.</TableCell>
                        </TableRow>

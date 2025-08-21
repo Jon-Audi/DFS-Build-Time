@@ -9,9 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Minus, Pause, Play, Plus, Square, Upload, X } from 'lucide-react'
-import { mockJobs, mockTaskTypes, mockUsers, mockMaterials } from '@/lib/data'
 import { useToast } from "@/hooks/use-toast"
-import type { MaterialCatalogItem } from '@/lib/types'
+import type { MaterialCatalogItem, TaskType } from '@/lib/types'
 import {
   Table,
   TableBody,
@@ -34,6 +33,8 @@ export function Timer() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
 
+  const [materials, setMaterials] = useState<MaterialCatalogItem[]>([]);
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [materialsUsed, setMaterialsUsed] = useState<MaterialUsed[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<string>("");
   const [materialQuantity, setMaterialQuantity] = useState<number>(1);
@@ -96,7 +97,7 @@ export function Timer() {
       });
       return;
     }
-    const material = mockMaterials.find(m => m.id === selectedMaterial);
+    const material = materials.find(m => m.id === selectedMaterial);
     if (material) {
       setMaterialsUsed(prev => [...prev, { material, quantity: materialQuantity }]);
       setSelectedMaterial("");
@@ -129,7 +130,8 @@ export function Timer() {
                   <SelectValue placeholder="Select a task" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockTaskTypes.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
+                  {taskTypes.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
+                   {taskTypes.length === 0 && <SelectItem value="all" disabled>No tasks found</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
@@ -204,9 +206,10 @@ export function Timer() {
                   <SelectValue placeholder="Select a material" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockMaterials.map(m => (
+                  {materials.map(m => (
                     <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                   ))}
+                   {materials.length === 0 && <SelectItem value="all" disabled>No materials found</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

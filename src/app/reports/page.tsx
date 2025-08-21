@@ -29,13 +29,13 @@ import {
 } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePickerWithRange } from "@/components/date-picker-range"
-import { mockJobs, mockUsers } from "@/lib/data"
 import { Download, ArrowDownUp } from "lucide-react"
 import { Label } from "@/components/ui/label"
-import type { Job } from "@/lib/types"
+import type { Job, User } from "@/lib/types"
 
 export default function ReportsPage() {
-  const [reportData, setReportData] = React.useState<Job[]>(mockJobs)
+  const [reportData, setReportData] = React.useState<Job[]>([])
+  const [users, setUsers] = React.useState<User[]>([]);
   const [sortConfig, setSortConfig] = React.useState<{ key: keyof Job | null; direction: 'ascending' | 'descending' }>({ key: null, direction: 'ascending' });
   const [selectedJob, setSelectedJob] = React.useState<Job | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -106,7 +106,8 @@ export default function ReportsPage() {
                     <SelectValue placeholder="All Employees" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockUsers.map(user => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
+                    {users.map(user => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
+                     {users.length === 0 && <SelectItem value="all" disabled>No employees found</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -138,7 +139,7 @@ export default function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedData.map((job) => (
+                  {sortedData.length > 0 ? sortedData.map((job) => (
                     <TableRow key={job.id}>
                       <TableCell 
                         className="font-medium cursor-pointer hover:underline"
@@ -151,7 +152,11 @@ export default function ReportsPage() {
                       <TableCell className="font-bold">{formatCurrency(job.totalCost)}</TableCell>
                       <TableCell>{job.status}</TableCell>
                     </TableRow>
-                  ))}
+                  )) : (
+                     <TableRow>
+                        <TableCell colSpan={5} className="text-center h-24">No report data.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

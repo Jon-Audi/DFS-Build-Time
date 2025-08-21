@@ -5,17 +5,16 @@ import { AppLayout } from "@/components/app-layout"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
 import { DollarSign, HardHat, Hourglass } from "lucide-react"
-import { mockJobs } from "@/lib/data"
 import type { Job } from "@/lib/types"
 
 const kpiData = [
-  { title: "Total Hours Tracked", value: "1,234", icon: Hourglass, change: "+12%" },
-  { title: "Total Material Cost", value: "$21,250", icon: DollarSign, change: "+8%" },
-  { title: "Total Labor Cost", value: "$12,900", icon: HardHat, change: "+15%" },
+  { title: "Total Hours Tracked", value: "0", icon: Hourglass, change: "" },
+  { title: "Total Material Cost", value: "$0.00", icon: DollarSign, change: "" },
+  { title: "Total Labor Cost", value: "$0.00", icon: HardHat, change: "" },
 ]
 
 export default function DashboardPage() {
-  const topJobs = [...mockJobs].sort((a, b) => b.totalCost - a.totalCost).slice(0, 5)
+  const [topJobs, setTopJobs] = React.useState<Job[]>([]);
 
   const formatCurrency = (value: number) => `$${new Intl.NumberFormat('en-US').format(value)}`;
 
@@ -34,7 +33,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{kpi.value}</div>
-                <p className="text-xs text-muted-foreground">{kpi.change} from last month</p>
+                <p className="text-xs text-muted-foreground">{kpi.change}</p>
               </CardContent>
             </Card>
           ))}
@@ -49,23 +48,29 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={topJobs} margin={{ top: 20, right: 0, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-                  <YAxis tickFormatter={formatCurrency} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={80} />
-                  <Tooltip
-                    cursor={{ fill: 'hsl(var(--secondary))' }}
-                    contentStyle={{
-                      background: 'hsl(var(--card))',
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                    }}
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                  <Bar dataKey="totalCost" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
-                     <LabelList dataKey="totalCost" position="top" formatter={formatCurrency} fontSize={12} />
-                  </Bar>
-                </BarChart>
+                {topJobs.length > 0 ? (
+                  <BarChart data={topJobs} margin={{ top: 20, right: 0, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <YAxis tickFormatter={formatCurrency} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} width={80} />
+                    <Tooltip
+                      cursor={{ fill: 'hsl(var(--secondary))' }}
+                      contentStyle={{
+                        background: 'hsl(var(--card))',
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                    <Bar dataKey="totalCost" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="totalCost" position="top" formatter={formatCurrency} fontSize={12} />
+                    </Bar>
+                  </BarChart>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    No job data available.
+                  </div>
+                )}
               </ResponsiveContainer>
             </CardContent>
           </Card>

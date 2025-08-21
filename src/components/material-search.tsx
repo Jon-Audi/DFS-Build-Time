@@ -5,8 +5,7 @@ import { useState } from "react";
 import { runFlow } from "@genkit-ai/next/client";
 import { enhanceMaterialSearch } from "@/ai/flows/enhance-material-search";
 import { suggestMaterials } from "@/ai/flows/suggest-materials";
-import type { MaterialCatalogItem } from "@/lib/types";
-import { mockMaterials, mockTaskTypes } from "@/lib/data";
+import type { MaterialCatalogItem, TaskType } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,38 +32,28 @@ import { Label } from "./ui/label";
 
 export function MaterialSearch() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [materials, setMaterials] = useState<MaterialCatalogItem[]>(mockMaterials);
+  const [materials, setMaterials] = useState<MaterialCatalogItem[]>([]);
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const [selectedTask, setSelectedTask] = useState<string>(mockTaskTypes[0].name);
+  const [selectedTask, setSelectedTask] = useState<string>("");
 
   const handleSearch = async (term: string) => {
     setLoading(true);
     try {
-      const { enhancedSearchTerm } = await runFlow(enhanceMaterialSearch, {
-        searchTerm: term,
-        taskType: selectedTask,
-        materialsPreviouslyUsed: "6ft Cedar Picket, 8ft Pressure-Treated Post 4x4",
-      });
-
-      toast({ title: "AI Search Enhancement", description: `Searching for: ${enhancedSearchTerm}` });
-
-      const searchTerms = enhancedSearchTerm.toLowerCase().split(',').map(t => t.trim());
-      const filteredMaterials = mockMaterials.filter((material) =>
-        searchTerms.some(st => material.name.toLowerCase().includes(st))
-      );
-      setMaterials(filteredMaterials);
+        // In a real app, you would fetch from Firestore based on the search term
+        // For now, we just show a loading state.
+        toast({ title: "Search", description: `Searching for: ${term}` });
+        setTimeout(() => {
+            setLoading(false);
+        }, 1000)
 
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "AI Error", description: "Failed to enhance search." });
-      const filteredMaterials = mockMaterials.filter((material) =>
-        material.name.toLowerCase().includes(term.toLowerCase())
-      );
-      setMaterials(filteredMaterials);
+      toast({ variant: "destructive", title: "Search Error", description: "Could not perform search." });
+      setLoading(false);
     }
-    setLoading(false);
   };
   
   const handleSuggest = async () => {
@@ -73,13 +62,14 @@ export function MaterialSearch() {
       const { suggestedMaterials: suggestions } = await runFlow(suggestMaterials, {
         jobDescription: "Installing a 6ft tall privacy fence in a residential backyard with rocky soil.",
         taskType: selectedTask,
-        previouslyUsedMaterials: ["6ft Cedar Picket", "8ft Cedar Rail 2x4"]
+        previouslyUsedMaterials: ["6ft Cedar Picket", "8ft Cedar Rail 2x4"],
+        materialCatalog: materials.map(m => ({ sku: m.sku, name: m.name, unit: m.unit, cost: m.cost }))
       });
 
       toast({ title: "AI Material Suggestions", description: `Found ${suggestions.length} relevant materials.` });
 
       const suggestedLower = suggestions.map(s => s.toLowerCase());
-      const filteredMaterials = mockMaterials.filter((material) =>
+      const filteredMaterials = materials.filter((material) =>
         suggestedLower.includes(material.name.toLowerCase())
       );
       setMaterials(filteredMaterials);
@@ -99,7 +89,7 @@ export function MaterialSearch() {
   };
 
   return (
-    <Card className="shadow-lg">
+    <Card className="shadow-lg w-full">
       <CardHeader>
         <CardTitle>Material Catalog</CardTitle>
         <CardDescription>
@@ -131,11 +121,12 @@ export function MaterialSearch() {
                 <SelectValue placeholder="Select a task" />
               </SelectTrigger>
               <SelectContent>
-                {mockTaskTypes.map((task) => (
+                {taskTypes.map((task) => (
                   <SelectItem key={task.id} value={task.name}>
                     {task.name}
                   </SelectItem>
                 ))}
+                 {taskTypes.length === 0 && <SelectItem value="all" disabled>No tasks found</SelectItem>}
               </SelectContent>
             </Select>
           </div>
