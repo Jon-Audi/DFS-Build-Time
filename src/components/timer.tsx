@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -76,15 +77,8 @@ export function Timer() {
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
            <div className="space-y-2">
-            <Label htmlFor="job-id">Job / Work Order</Label>
-            <Select>
-              <SelectTrigger id="job-id">
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockJobs.map(job => <SelectItem key={job.id} value={job.id}>{job.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="job-name">Job / Work Order</Label>
+            <Input id="job-name" placeholder="Enter job name or work order #" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="task-type">Task Type</Label>
