@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Fence-It Supply',
-  description: 'Fence-It Supply: Wholesale and retail fencing materials.',
+  title: 'Delaware Fence Solutions',
+  description: 'Delaware Fence Solutions: In-house manufacturing and time tracking.',
 };
 
 export default function RootLayout({
