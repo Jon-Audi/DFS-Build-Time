@@ -33,7 +33,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Sales';
+  role: 'Admin' | 'Yard Staff' | 'Welder';
   rate: number; // hourly rate
 }
 

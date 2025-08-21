@@ -33,7 +33,7 @@ const menuItems = [
   },
   {
     href: "/tracker",
-    label: "Quote Calculator",
+    label: "Time Tracker",
     icon: Timer,
   },
   {

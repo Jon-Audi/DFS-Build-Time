@@ -50,8 +50,8 @@ export function Timer() {
 
   const handleStop = () => {
     toast({
-      title: "Quote Saved",
-      description: `Your quote has been saved.`,
+      title: "Time Saved",
+      description: `Your time has been logged successfully.`,
       variant: "default",
     })
     setIsRunning(false)
@@ -70,35 +70,62 @@ export function Timer() {
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
       <CardHeader>
-        <CardTitle>Quote Calculator</CardTitle>
-        <CardDescription>Create a new quote for a customer.</CardDescription>
+        <CardTitle>Time Tracker</CardTitle>
+        <CardDescription>Track time spent on manufacturing tasks.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-          <div className="space-y-2">
-            <Label htmlFor="customer-name">Customer Name</Label>
-            <Input id="customer-name" placeholder="Enter customer name" />
+           <div className="space-y-2">
+            <Label htmlFor="job-id">Job / Work Order</Label>
+            <Select>
+              <SelectTrigger id="job-id">
+                <SelectValue placeholder="Select a job" />
+              </SelectTrigger>
+              <SelectContent>
+                {mockJobs.map(job => <SelectItem key={job.id} value={job.id}>{job.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="project-name">Project Name</Label>
-            <Input id="project-name" placeholder="e.g., Backyard Privacy Fence" />
+            <Label htmlFor="task-type">Task Type</Label>
+            <Select>
+              <SelectTrigger id="task-type">
+                <SelectValue placeholder="Select a task" />
+              </SelectTrigger>
+              <SelectContent>
+                {mockTaskTypes.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="fence-type">Fence Type</Label>
-          <Select>
-            <SelectTrigger id="fence-type">
-              <SelectValue placeholder="Select a fence type" />
-            </SelectTrigger>
-            <SelectContent>
-              {mockTaskTypes.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        <div className="p-6 my-4 bg-muted rounded-lg text-center">
+          <p className="text-6xl font-mono font-bold tracking-tighter">
+            {formatTime(time)}
+          </p>
+        </div>
+
+        <div className="flex justify-center gap-2">
+          {!isRunning ? (
+            <Button onClick={handleStart} className="w-24">
+              <Play className="mr-2" /> Start
+            </Button>
+          ) : isPaused ? (
+            <Button onClick={handleResume} className="w-24">
+              <Play className="mr-2" /> Resume
+            </Button>
+          ) : (
+            <Button onClick={handlePause} variant="secondary" className="w-24">
+              <Pause className="mr-2" /> Pause
+            </Button>
+          )}
+          <Button onClick={handleStop} variant="destructive" className="w-24" disabled={!isRunning}>
+            <Square className="mr-2" /> Stop
+          </Button>
         </div>
         
         <div className="space-y-2">
-          <Label>Linear Feet</Label>
+          <Label>Units Completed</Label>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => setUnits(u => Math.max(0, u - 1))}>
               <Minus className="h-4 w-4" />
@@ -112,15 +139,22 @@ export function Timer() {
 
         <div className="space-y-2">
           <Label htmlFor="notes">Notes</Label>
-          <Textarea id="notes" placeholder="Add any relevant notes for the quote..." />
+          <Textarea id="notes" placeholder="Add any relevant notes about this task..." />
         </div>
+
+        <div className="space-y-2">
+            <Label htmlFor="photo-upload">Upload Photos</Label>
+            <div className="flex items-center gap-2">
+                <Input id="photo-upload" type="file" className="flex-1" multiple />
+                <Button variant="outline"><Upload className="mr-2" /> Upload</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Attach photos of completed work.</p>
+        </div>
+
       </CardContent>
       <CardFooter className="flex justify-end gap-2">
-         <Button variant="outline">
-          Calculate Materials
-        </Button>
         <Button>
-          Save Quote
+          Save Log
         </Button>
       </CardFooter>
     </Card>

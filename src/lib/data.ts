@@ -2,16 +2,15 @@ import type { Job, Material, User, TaskType } from './types';
 
 export const mockUsers: User[] = [
   { id: 'user-1', name: 'John Doe', email: 'john.doe@fenceit.com', role: 'Admin', rate: 45 },
-  { id: 'user-2', name: 'Jane Smith', email: 'jane.smith@fenceit.com', role: 'Sales', rate: 35 },
-  { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@fenceit.com', role: 'Sales', rate: 32 },
+  { id: 'user-2', name: 'Jane Smith', email: 'jane.smith@fenceit.com', role: 'Yard Staff', rate: 22 },
+  { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@fenceit.com', role: 'Welder', rate: 28 },
 ];
 
 export const mockJobs: Job[] = [
   { id: 'job-1', name: 'Anderson Residence Fence', client: 'Mr. Anderson', materialCost: 1250, laborCost: 800, overheadCost: 410, totalCost: 2460, status: 'Completed' },
   { id: 'job-2', name: 'Maple Street Community Garden', client: 'City Council', materialCost: 3400, laborCost: 2200, overheadCost: 1120, totalCost: 6720, status: 'In Progress' },
   { id: 'job-3', name: 'Suburban Office Park Perimeter', client: 'Prime Properties', materialCost: 5600, laborCost: 3500, overheadCost: 1820, totalCost: 10920, status: 'In Progress' },
-  { id: 'job-4', name: 'Private Estate Security Fence', client: 'Ms. Wallace', materialCost: 8900, laborCost: 5000, overheadCost: 2780, totalCost: 16680, status: 'On Hold' },
-  { id: 'job-5', name: 'Johnson Farm Livestock Fence', client: 'Mr. Johnson', materialCost: 2100, laborCost: 1500, overheadCost: 720, totalCost: 4320, status: 'Completed' },
+  { id: 'job-4', name: 'Internal Stock Build', client: 'Internal', materialCost: 1500, laborCost: 0, overheadCost: 0, totalCost: 1500, status: 'In Progress' },
 ];
 
 export const mockMaterials: Material[] = [
@@ -28,10 +27,10 @@ export const mockMaterials: Material[] = [
 ];
 
 export const mockTaskTypes: TaskType[] = [
-  { id: 'task-1', name: 'Wood Privacy' },
-  { id: 'task-2', name: 'Chain Link' },
-  { id: 'task-3', name: 'Vinyl' },
-  { id: 'task-4', name: 'Aluminum' },
-  { id: 'task-5', name: 'Farm & Ranch' },
-  { id: 'task-6', name: 'Custom Gate' },
+    { id: 'task-1', name: 'Wood Section Assembly' },
+    { id: 'task-2', name: 'Pipe Cutting & Prep' },
+    { id: 'task-3', name: 'Gate Welding' },
+    { id: 'task-4', name: 'Gate Cleaning & Wiring' },
+    { id: 'task-5', name: 'Material Pulling' },
+    { id: 'task-6', name: 'Yard Maintenance' },
 ];
