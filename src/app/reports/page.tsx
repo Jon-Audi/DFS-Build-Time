@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -11,6 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import {
   Table,
   TableBody,
@@ -29,6 +37,8 @@ import type { Job } from "@/lib/types"
 export default function ReportsPage() {
   const [reportData, setReportData] = React.useState<Job[]>(mockJobs)
   const [sortConfig, setSortConfig] = React.useState<{ key: keyof Job | null; direction: 'ascending' | 'descending' }>({ key: null, direction: 'ascending' });
+  const [selectedJob, setSelectedJob] = React.useState<Job | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
   const sortedData = React.useMemo(() => {
     let sortableItems = [...reportData];
@@ -52,6 +62,11 @@ export default function ReportsPage() {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
+  };
+
+  const handleRowClick = (job: Job) => {
+    setSelectedJob(job);
+    setIsDialogOpen(true);
   };
   
   const formatCurrency = (value: number) => `$${new Intl.NumberFormat('en-US').format(value)}`;
@@ -105,7 +120,7 @@ export default function ReportsPage() {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Job Cost Summary</CardTitle>
-            <CardDescription>Detailed breakdown of job costs.</CardDescription>
+            <CardDescription>Detailed breakdown of job costs. Click a job to see details.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border rounded-lg overflow-hidden">
@@ -113,7 +128,7 @@ export default function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     {['name', 'materialCost', 'laborCost', 'totalCost', 'status'].map((key) => (
-                      <TableHead key={key} className="cursor-pointer" onClick={() => requestSort(key as keyof Job)}>
+                      <TableHead key={key} className={key === 'name' ? '' : 'cursor-pointer'} onClick={() => key !== 'name' && requestSort(key as keyof Job)}>
                         <div className="flex items-center gap-2">
                           {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                           {sortConfig.key === key && <ArrowDownUp className="h-4 w-4" />}
@@ -125,7 +140,12 @@ export default function ReportsPage() {
                 <TableBody>
                   {sortedData.map((job) => (
                     <TableRow key={job.id}>
-                      <TableCell className="font-medium">{job.name}</TableCell>
+                      <TableCell 
+                        className="font-medium cursor-pointer hover:underline"
+                        onClick={() => handleRowClick(job)}
+                      >
+                        {job.name}
+                      </TableCell>
                       <TableCell>{formatCurrency(job.materialCost)}</TableCell>
                       <TableCell>{formatCurrency(job.laborCost)}</TableCell>
                       <TableCell className="font-bold">{formatCurrency(job.totalCost)}</TableCell>
@@ -143,6 +163,47 @@ export default function ReportsPage() {
           </CardFooter>
         </Card>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedJob?.name}</DialogTitle>
+            <DialogDescription>
+              Detailed cost breakdown for this job.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedJob && (
+            <div className="space-y-4 py-4">
+               <div className="grid grid-cols-2 items-center gap-4">
+                  <span className="text-muted-foreground">Client</span>
+                  <span className="font-medium text-right">{selectedJob.client}</span>
+               </div>
+               <div className="grid grid-cols-2 items-center gap-4">
+                  <span className="text-muted-foreground">Status</span>
+                  <span className="font-medium text-right">{selectedJob.status}</span>
+               </div>
+               <hr className="border-border" />
+              <div className="grid grid-cols-2 items-center gap-4">
+                <span className="text-muted-foreground">Material Cost</span>
+                <span className="font-mono text-right">{formatCurrency(selectedJob.materialCost)}</span>
+              </div>
+              <div className="grid grid-cols-2 items-center gap-4">
+                <span className="text-muted-foreground">Labor Cost</span>
+                <span className="font-mono text-right">{formatCurrency(selectedJob.laborCost)}</span>
+              </div>
+              <div className="grid grid-cols-2 items-center gap-4">
+                <span className="text-muted-foreground">Overhead Cost</span>
+                <span className="font-mono text-right">{formatCurrency(selectedJob.overheadCost)}</span>
+              </div>
+              <hr className="border-border" />
+              <div className="grid grid-cols-2 items-center gap-4 font-bold text-lg">
+                <span>Total Cost</span>
+                <span className="font-mono text-right">{formatCurrency(selectedJob.totalCost)}</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }
