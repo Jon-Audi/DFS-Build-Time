@@ -1,6 +1,7 @@
 
 "use client"
 
+import * as React from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,6 +12,14 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -23,11 +32,20 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { mockUsers, mockTaskTypes, mockMaterials } from "@/lib/data"
-import { PlusCircle, Trash2, FileUp, FileDown } from "lucide-react"
+import { PlusCircle, Trash2, FileUp, FileDown, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import type { TaskType } from "@/lib/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function AdminPage() {
   const formatCurrency = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+  const [selectedTask, setSelectedTask] = React.useState<TaskType | null>(null)
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = React.useState(false)
+
+  const handleTaskRowClick = (task: TaskType) => {
+    setSelectedTask(task)
+    setIsTaskDialogOpen(true)
+  }
 
   return (
     <AppLayout>
@@ -113,7 +131,7 @@ export default function AdminPage() {
             <Card className="shadow-lg mt-4">
               <CardHeader>
                 <CardTitle>Task Types</CardTitle>
-                <CardDescription>Manage the task types available for job tracking.</CardDescription>
+                <CardDescription>Manage the task types and their default materials. Click a row to edit.</CardDescription>
               </CardHeader>
               <CardContent>
                  <div className="border rounded-lg overflow-hidden">
@@ -121,15 +139,17 @@ export default function AdminPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Task Name</TableHead>
+                        <TableHead>Default Materials</TableHead>
                         <TableHead className="text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {mockTaskTypes.map((task) => (
-                        <TableRow key={task.id}>
+                        <TableRow key={task.id} onClick={() => handleTaskRowClick(task)} className="cursor-pointer">
                           <TableCell className="font-medium">{task.name}</TableCell>
+                          <TableCell>{task.defaultMaterials?.length ?? 0} items</TableCell>
                           <TableCell className="text-center">
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); /* logic to delete */ }}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>
@@ -200,6 +220,84 @@ export default function AdminPage() {
 
         </Tabs>
       </div>
+
+      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Task Type: {selectedTask?.name}</DialogTitle>
+            <DialogDescription>
+              Manage the default materials associated with this task.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="task-name">Task Name</Label>
+              <Input id="task-name" value={selectedTask?.name} />
+            </div>
+            
+            <div className="space-y-4">
+              <Label>Default Materials</Label>
+              <div className="flex items-end gap-2">
+                 <div className="grid gap-1.5 flex-1">
+                   <Label htmlFor="material-select" className="sr-only">Material</Label>
+                    <Select>
+                      <SelectTrigger id="material-select">
+                        <SelectValue placeholder="Select a material to add" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mockMaterials.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                 </div>
+                 <div className="grid gap-1.5">
+                    <Label htmlFor="material-quantity" className="sr-only">Quantity</Label>
+                    <Input id="material-quantity" type="number" placeholder="Qty" className="w-20" />
+                 </div>
+                <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4"/>Add</Button>
+              </div>
+
+              <div className="border rounded-lg max-h-60 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Material</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedTask?.defaultMaterials?.map(dm => {
+                       const material = mockMaterials.find(m => m.sku === dm.sku);
+                       return (
+                         <TableRow key={dm.sku}>
+                           <TableCell className="font-medium">{material?.name ?? 'Unknown'}</TableCell>
+                           <TableCell>{dm.quantity} {material?.unit}(s)</TableCell>
+                           <TableCell className="text-right">
+                             <Button variant="ghost" size="icon">
+                               <X className="h-4 w-4 text-destructive" />
+                             </Button>
+                           </TableCell>
+                         </TableRow>
+                       );
+                    })}
+                    {!selectedTask?.defaultMaterials?.length && (
+                       <TableRow>
+                         <TableCell colSpan={3} className="text-center h-24">No materials associated.</TableCell>
+                       </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
+            <Button>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

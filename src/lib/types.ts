@@ -58,6 +58,10 @@ export interface TaskType {
   defaultLaborRate?: number;
   defaultOverheadPct?: number;
   isActive?: boolean;
+  defaultMaterials?: {
+    sku: string;
+    quantity: number;
+  }[];
 }
 
 export interface OrganizationRates {

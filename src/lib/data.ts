@@ -28,9 +28,23 @@ export const mockMaterials: MaterialCatalogItem[] = [
 ];
 
 export const mockTaskTypes: TaskType[] = [
-    { id: 'task-1', name: 'Wood Section Assembly' },
+    { 
+      id: 'task-1', 
+      name: 'Wood Section Assembly',
+      defaultMaterials: [
+        { sku: 'WD-PC-6C', quantity: 15 },
+        { sku: 'WD-CR-8C', quantity: 3 },
+        { sku: 'HW-GS-1B', quantity: 0.1 }
+      ]
+    },
     { id: 'task-2', name: 'Pipe Cutting & Prep' },
-    { id: 'task-3', name: 'Gate Welding' },
+    { 
+      id: 'task-3', 
+      name: 'Gate Welding',
+      defaultMaterials: [
+        { sku: 'CL-TR-10', quantity: 4 },
+      ]
+    },
     { id: 'task-4', name: 'Gate Cleaning & Wiring' },
     { id: 'task-5', name: 'Material Pulling' },
     { id: 'task-6', name: 'Yard Maintenance' },
