@@ -11,11 +11,18 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import type { MaterialCatalogItem } from '@/lib/types';
 
 const SuggestMaterialsInputSchema = z.object({
   jobDescription: z.string().describe('The description of the fencing job.'),
   taskType: z.string().describe('The type of task being performed (e.g., post installation, rail installation).'),
   previouslyUsedMaterials: z.array(z.string()).optional().describe('List of material names that have been used in similar jobs'),
+  materialCatalog: z.array(z.object({
+    sku: z.string(),
+    name: z.string(),
+    unit: z.string(),
+    cost: z.number(),
+  })).describe('The full list of available materials in the catalog.'),
 });
 export type SuggestMaterialsInput = z.infer<typeof SuggestMaterialsInputSchema>;
 
@@ -35,11 +42,16 @@ const suggestMaterialsPrompt = ai.definePrompt({
   output: {schema: SuggestMaterialsOutputSchema},
   prompt: `You are an AI assistant helping a fencing worker suggest materials for a job.
 
-  Based on the job description and task type, suggest a list of relevant materials from the catalog.
-  Consider materials that have been previously used in similar jobs. Only use names of actual materials. Output the names in an array.
+  Based on the job description and task type, suggest a list of relevant materials from the provided catalog.
+  Consider materials that have been previously used in similar jobs. Only use names of actual materials from the catalog. Output the names in an array.
 
   Job Description: {{{jobDescription}}}
   Task Type: {{{taskType}}}
+
+  Available Materials Catalog:
+  {{#each materialCatalog}}
+  - {{this.name}} (SKU: {{this.sku}})
+  {{/each}}
 
   {{#if previouslyUsedMaterials}}
   Previously Used Materials: {{{previouslyUsedMaterials}}}
