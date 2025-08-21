@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Track-It Fencing',
-  description: 'Track-It Fencing: Job tracking and management for fencing professionals.',
+  title: 'Fence-It Supply',
+  description: 'Fence-It Supply: Wholesale and retail fencing materials.',
 };
 
 export default function RootLayout({

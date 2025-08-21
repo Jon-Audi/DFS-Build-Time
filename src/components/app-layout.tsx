@@ -33,7 +33,7 @@ const menuItems = [
   },
   {
     href: "/tracker",
-    label: "Job Tracker",
+    label: "Quote Calculator",
     icon: Timer,
   },
   {
@@ -65,9 +65,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <Briefcase className="w-8 h-8 text-primary" />
               <div className="flex flex-col">
                 <h2 className="text-lg font-bold tracking-tight text-primary">
-                  Track-It
+                  Fence-It
                 </h2>
-                <p className="text-xs text-muted-foreground">Fencing</p>
+                <p className="text-xs text-muted-foreground">Supply Co.</p>
               </div>
             </div>
           </SidebarHeader>
@@ -100,7 +100,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto">
           <header className="sticky top-0 z-10 flex items-center h-16 px-4 bg-background/80 backdrop-blur-sm border-b md:hidden">
             <SidebarTrigger />
-            <h2 className="ml-4 text-lg font-semibold tracking-tight">Track-It Fencing</h2>
+            <h2 className="ml-4 text-lg font-semibold tracking-tight">Fence-It Supply</h2>
           </header>
           <div className="p-4 md:p-6 lg:p-8">
             {children}

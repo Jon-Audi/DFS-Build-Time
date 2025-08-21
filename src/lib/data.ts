@@ -1,9 +1,9 @@
 import type { Job, Material, User, TaskType } from './types';
 
 export const mockUsers: User[] = [
-  { id: 'user-1', name: 'John Doe', email: 'john.doe@trackit.com', role: 'Admin', rate: 45 },
-  { id: 'user-2', name: 'Jane Smith', email: 'jane.smith@trackit.com', role: 'Worker', rate: 35 },
-  { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@trackit.com', role: 'Worker', rate: 32 },
+  { id: 'user-1', name: 'John Doe', email: 'john.doe@fenceit.com', role: 'Admin', rate: 45 },
+  { id: 'user-2', name: 'Jane Smith', email: 'jane.smith@fenceit.com', role: 'Sales', rate: 35 },
+  { id: 'user-3', name: 'Mike Johnson', email: 'mike.johnson@fenceit.com', role: 'Sales', rate: 32 },
 ];
 
 export const mockJobs: Job[] = [
@@ -28,10 +28,10 @@ export const mockMaterials: Material[] = [
 ];
 
 export const mockTaskTypes: TaskType[] = [
-  { id: 'task-1', name: 'Post Installation' },
-  { id: 'task-2', name: 'Rail Installation' },
-  { id: 'task-3', name: 'Picket/Panel Installation' },
-  { id: 'task-4', name: 'Gate Installation' },
-  { id: 'task-5', name: 'Demolition' },
-  { id: 'task-6', name: 'Site Prep' },
+  { id: 'task-1', name: 'Wood Privacy' },
+  { id: 'task-2', name: 'Chain Link' },
+  { id: 'task-3', name: 'Vinyl' },
+  { id: 'task-4', name: 'Aluminum' },
+  { id: 'task-5', name: 'Farm & Ranch' },
+  { id: 'task-6', name: 'Custom Gate' },
 ];

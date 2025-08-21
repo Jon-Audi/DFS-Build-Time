@@ -50,8 +50,8 @@ export function Timer() {
 
   const handleStop = () => {
     toast({
-      title: "Session Saved",
-      description: `Your work session of ${formatTime(time)} has been saved.`,
+      title: "Quote Saved",
+      description: `Your quote has been saved.`,
       variant: "default",
     })
     setIsRunning(false)
@@ -70,69 +70,40 @@ export function Timer() {
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
       <CardHeader>
-        <CardTitle>Job Tracker</CardTitle>
-        <CardDescription>Start the timer to track your work session.</CardDescription>
+        <CardTitle>Quote Calculator</CardTitle>
+        <CardDescription>Create a new quote for a customer.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="text-center">
-          <p className="text-6xl font-mono font-bold text-primary tracking-widest transition-colors duration-300">
-            {formatTime(time)}
-          </p>
-        </div>
-
-        <div className="flex justify-center gap-2">
-          {!isRunning ? (
-            <Button onClick={handleStart} size="lg" className="bg-primary hover:bg-primary/90">
-              <Play className="mr-2 h-5 w-5" /> Start
-            </Button>
-          ) : isPaused ? (
-            <Button onClick={handleResume} size="lg" variant="outline" className="text-primary border-primary hover:bg-primary/10 hover:text-primary">
-              <Play className="mr-2 h-5 w-5" /> Resume
-            </Button>
-          ) : (
-            <Button onClick={handlePause} size="lg" variant="outline" className="text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700">
-              <Pause className="mr-2 h-5 w-5" /> Pause
-            </Button>
-          )}
-          {isRunning && (
-            <Button onClick={handleStop} size="lg" variant="destructive">
-              <Square className="mr-2 h-5 w-5" /> Stop & Save
-            </Button>
-          )}
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
           <div className="space-y-2">
-            <Label htmlFor="job">Job</Label>
-            <Select>
-              <SelectTrigger id="job">
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockJobs.map(job => <SelectItem key={job.id} value={job.id}>{job.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="customer-name">Customer Name</Label>
+            <Input id="customer-name" placeholder="Enter customer name" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="task-type">Task Type</Label>
-            <Select>
-              <SelectTrigger id="task-type">
-                <SelectValue placeholder="Select a task type" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockTaskTypes.map(task => <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="project-name">Project Name</Label>
+            <Input id="project-name" placeholder="e.g., Backyard Privacy Fence" />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="fence-type">Fence Type</Label>
+          <Select>
+            <SelectTrigger id="fence-type">
+              <SelectValue placeholder="Select a fence type" />
+            </SelectTrigger>
+            <SelectContent>
+              {mockTaskTypes.map(task => <SelectItem key={task.id} value={task.name}>{task.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         
         <div className="space-y-2">
-          <Label>Units Completed</Label>
+          <Label>Linear Feet</Label>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => setUnits(u => Math.max(0, u - 1))}>
               <Minus className="h-4 w-4" />
             </Button>
-            <Input type="number" value={units} onChange={(e) => setUnits(Number(e.target.value))} className="text-center w-20" />
+            <Input type="number" value={units} onChange={(e) => setUnits(Number(e.target.value))} className="text-center w-20" placeholder="0" />
             <Button variant="outline" size="icon" onClick={() => setUnits(u => u + 1)}>
               <Plus className="h-4 w-4" />
             </Button>
@@ -141,12 +112,15 @@ export function Timer() {
 
         <div className="space-y-2">
           <Label htmlFor="notes">Notes</Label>
-          <Textarea id="notes" placeholder="Add any relevant notes..." />
+          <Textarea id="notes" placeholder="Add any relevant notes for the quote..." />
         </div>
       </CardContent>
-      <CardFooter>
-        <Button variant="outline" className="w-full">
-          <Upload className="mr-2 h-4 w-4" /> Upload Photos
+      <CardFooter className="flex justify-end gap-2">
+         <Button variant="outline">
+          Calculate Materials
+        </Button>
+        <Button>
+          Save Quote
         </Button>
       </CardFooter>
     </Card>
