@@ -47,8 +47,8 @@ export interface MaterialCatalogItem {
 export interface User {
   id: string;
   name: string;
-  email: string; // Can be a synthetic email
-  role: 'Admin' | 'Yard Staff' | 'Welder' | 'Supervisor' | 'Worker';
+  email: string;
+  role: 'Admin' | 'Supervisor' | 'Worker';
   rate: number; // hourly rate
   isActive: boolean;
 }

@@ -196,55 +196,28 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
   if (req.auth?.token?.role !== "admin") {
     throw new HttpsError("permission-denied", "admin only");
   }
-  const { name, role, hourlyRate } = req.data;
+  const { email, role, hourlyRate, name } = req.data;
+  const tempPassword = req.data.tempPassword || Math.random().toString(36).slice(-10) + "A1!";
 
-  if (!name) {
-      throw new HttpsError("invalid-argument", "Name is required.");
-  }
+  const user = await admin.auth().createUser({
+    email,
+    password: tempPassword,
+    emailVerified: false,
+    disabled: false,
+  });
 
-  // Sanitize name and create a synthetic email.
-  const sanitizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (!sanitizedName) {
-      throw new HttpsError("invalid-argument", "Name must contain alphanumeric characters.");
-  }
-  const syntheticEmail = `${sanitizedName}@pin.track-it-fencing.com`;
-  
-  // Use a random 8-character string for the temporary password.
-  const tempPassword = Math.random().toString(36).slice(-8);
-
-  let user;
-  try {
-      user = await admin.auth().createUser({
-          email: syntheticEmail,
-          password: tempPassword,
-          emailVerified: true, // It's a synthetic email, so we can mark it as verified.
-          displayName: name,
-          disabled: false,
-      });
-  } catch (error: any) {
-      if (error.code === 'auth/email-already-exists') {
-          // This error is caught when the sanitized name results in a duplicate email.
-          throw new HttpsError("already-exists", `A user with a similar name already exists. Please try a different name.`);
-      }
-      logger.error("Error creating user:", error);
-      throw new HttpsError("internal", "An unexpected error occurred while creating the user.");
-  }
-
-  // Set the custom claims for the user (e.g., their role).
   await admin.auth().setCustomUserClaims(user.uid, { role });
 
-  // Create a corresponding user document in Firestore.
   await db.doc(`users/${user.uid}`).set({
-      name,
-      email: syntheticEmail,
-      role,
-      rate: hourlyRate || 0,
-      isActive: true,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    name,
+    email,
+    role,
+    rate: hourlyRate || 0,
+    isActive: true,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 
-  // Return the new user's details, including their temporary password.
-  return { uid: user.uid, email: syntheticEmail, tempPassword };
+  return { uid: user.uid, email, tempPassword };
 });
 
 
@@ -252,11 +225,6 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
 export const enforceSignupDomain = beforeUserCreated({ region: REGION }, (event) => {
   const email = event.data.email || "";
   const domain = email.split("@")[1]?.toLowerCase() || "";
-  
-  // Allow synthetic PIN-based signups
-  if (domain === "pin.track-it-fencing.com") {
-      return;
-  }
 
   if (!ALLOWED_SIGNUP_DOMAIN) return; // disabled if empty
 
