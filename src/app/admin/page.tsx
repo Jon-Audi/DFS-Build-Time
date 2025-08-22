@@ -75,8 +75,9 @@ export default function AdminPage() {
       } catch (error) {
         console.error("Error fetching data:", error);
         toast({ variant: 'destructive', title: "Error", description: "Failed to load data from Firestore." });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchData();
   }, [toast]);
@@ -432,3 +433,5 @@ export default function AdminPage() {
     </AppLayout>
   )
 }
+
+    
