@@ -2,8 +2,9 @@
 "use client"
 
 import * as React from "react"
-import { db } from "@/lib/firebase"
-import { collection, doc, getDocs, setDoc, addDoc, deleteDoc, updateDoc } from "firebase/firestore"
+import { db, functions } from "@/lib/firebase"
+import { httpsCallable } from "firebase/functions"
+import { collection, doc, getDocs, setDoc, addDoc, deleteDoc, updateDoc, writeBatch, query, where } from "firebase/firestore"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,6 +23,18 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -33,11 +46,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PlusCircle, Trash2, FileUp, FileDown, X, Edit } from "lucide-react"
+import { PlusCircle, Trash2, FileUp, FileDown, X, Edit, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { TaskType, User, MaterialCatalogItem, OrganizationRates } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { Switch } from "@/components/ui/switch"
 
 export default function AdminPage() {
   const { toast } = useToast()
@@ -47,41 +61,46 @@ export default function AdminPage() {
   const [rates, setRates] = React.useState<OrganizationRates>({ defaultLaborRate: 0, defaultOverheadPct: 0 });
   
   const [loading, setLoading] = React.useState(true);
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
-  // States for forms/dialogs
+  // --- Dialog states ---
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = React.useState(false)
+  const [isInviteUserOpen, setIsInviteUserOpen] = React.useState(false)
+  const [isMaterialDialogOpen, setIsMaterialDialogOpen] = React.useState(false)
+
+  // --- Form states ---
   const [newTaskTypeName, setNewTaskTypeName] = React.useState("");
   const [selectedTask, setSelectedTask] = React.useState<TaskType | null>(null)
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = React.useState(false)
+  const [newInvite, setNewInvite] = React.useState({ email: '', role: 'Worker', hourlyRate: 0 });
+  const [editingMaterial, setEditingMaterial] = React.useState<Partial<MaterialCatalogItem> | null>(null);
 
-  // Fetch all data on component mount
-  React.useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
 
-        const taskTypesSnapshot = await getDocs(collection(db, "taskTypes"));
-        setTaskTypes(taskTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaskType)));
-        
-        const materialsSnapshot = await getDocs(collection(db, "materialsCatalog"));
-        setMaterials(materialsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaterialCatalogItem)));
+      const taskTypesSnapshot = await getDocs(collection(db, "taskTypes"));
+      setTaskTypes(taskTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaskType)));
+      
+      const materialsSnapshot = await getDocs(collection(db, "materialsCatalog"));
+      setMaterials(materialsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaterialCatalogItem)));
 
-        const ratesDoc = await getDocs(collection(db, "rates"));
-        if (!ratesDoc.empty) {
-          setRates(ratesDoc.docs[0].data() as OrganizationRates);
-        }
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Failed to load data from Firestore." });
-      } finally {
-        setLoading(false);
+      const ratesDoc = await getDocs(collection(db, "rates"));
+      if (!ratesDoc.empty) {
+        setRates(ratesDoc.docs[0].data() as OrganizationRates);
       }
-    };
-    fetchData();
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Failed to load data from Firestore." });
+    } finally {
+      setLoading(false);
+    }
   }, [toast]);
 
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
   
@@ -92,28 +111,33 @@ export default function AdminPage() {
   
   const handleSaveChanges = async () => {
     if (!selectedTask) return;
+    setIsProcessing(true);
     try {
       await updateDoc(doc(db, "taskTypes", selectedTask.id), {
         name: selectedTask.name,
         defaultMaterials: selectedTask.defaultMaterials || []
       });
-      // Refresh local state
-      setTaskTypes(prev => prev.map(t => t.id === selectedTask.id ? selectedTask : t));
+      await fetchData()
       toast({ title: "Success", description: "Task type updated successfully." });
       setIsTaskDialogOpen(false);
     } catch(error) {
       console.error(error);
       toast({ variant: 'destructive', title: "Error", description: "Failed to save changes." });
+    } finally {
+      setIsProcessing(false);
     }
   }
 
   const handleSaveRates = async () => {
+    setIsProcessing(true);
     try {
       await setDoc(doc(db, "rates", "default"), rates, { merge: true });
       toast({ title: "Success", description: "Rates saved successfully." });
     } catch (error) {
       console.error("Error saving rates:", error);
       toast({ variant: 'destructive', title: "Error", description: "Could not save rates." });
+    } finally {
+      setIsProcessing(false);
     }
   };
   
@@ -122,41 +146,142 @@ export default function AdminPage() {
       toast({ variant: 'destructive', title: "Error", description: "Task type name cannot be empty." });
       return;
     }
+    setIsProcessing(true);
     try {
-      const docRef = await addDoc(collection(db, "taskTypes"), { name: newTaskTypeName, isActive: true });
-      setTaskTypes(prev => [...prev, { id: docRef.id, name: newTaskTypeName, isActive: true }]);
+      await addDoc(collection(db, "taskTypes"), { name: newTaskTypeName, isActive: true });
+      await fetchData()
       toast({ title: "Success", description: `Task type "${newTaskTypeName}" added.` });
       setNewTaskTypeName("");
     } catch (error) {
       console.error("Error adding task type:", error);
       toast({ variant: 'destructive', title: "Error", description: "Could not add task type." });
+    } finally {
+      setIsProcessing(false);
     }
   }
 
   const handleDeleteTaskType = async (taskId: string) => {
+    setIsProcessing(true);
     try {
       await deleteDoc(doc(db, "taskTypes", taskId));
-      setTaskTypes(prev => prev.filter(t => t.id !== taskId));
+      await fetchData();
       toast({ title: "Success", description: "Task type deleted." });
     } catch (error) {
       console.error("Error deleting task type:", error);
       toast({ variant: 'destructive', title: "Error", description: "Could not delete task type." });
+    } finally {
+      setIsProcessing(false);
     }
   }
   
-  const handleInviteUser = () => {
-     toast({ title: "Invite Sent", description: "A user has been invited (placeholder)." })
+  const handleInviteUser = async () => {
+    if (!newInvite.email || !newInvite.role) {
+      toast({ variant: "destructive", title: "Missing fields", description: "Please enter email and select a role." });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const inviteUserFn = httpsCallable(functions, 'inviteUser');
+      const result = await inviteUserFn(newInvite);
+      console.log(result.data);
+      toast({
+        title: "User Invited",
+        description: `An invitation has been sent to ${newInvite.email}. Temporary password: ${(result.data as any).tempPassword}`
+      });
+      await fetchData();
+      setIsInviteUserOpen(false);
+      setNewInvite({ email: '', role: 'Worker', hourlyRate: 0 });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to invite user." });
+    } finally {
+      setIsProcessing(false);
+    }
   }
   
-  const handleDeleteUser = (userId: string) => {
-    toast({ title: "User Removed", description: `User ${userId} has been removed (placeholder).` })
+  const handleDeleteUser = async (userId: string) => {
+    setIsProcessing(true);
+    try {
+      // In a real app, this would call a Cloud Function to delete the user from Auth and Firestore.
+      await deleteDoc(doc(db, "users", userId));
+      await fetchData();
+      toast({ title: "User Removed", description: `User ${userId} has been removed.` })
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: "Could not delete user." });
+    } finally {
+      setIsProcessing(false);
+    }
   }
+
+  const handleUpdateUser = async (userId: string, field: keyof User, value: any) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, { [field]: value });
+      if (field === 'role') {
+        const setRoleClaimFn = httpsCallable(functions, 'setRoleClaim');
+        await setRoleClaimFn({ uid: userId, role: value });
+      }
+      setUsers(users.map(u => u.id === userId ? { ...u, [field]: value } : u));
+      toast({ title: 'User Updated', description: `User ${userId} has been updated.` });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user.' });
+      fetchData(); // Re-fetch to revert optimistic update on error
+    }
+  };
+
+  const openMaterialDialog = (material: Partial<MaterialCatalogItem> | null = null) => {
+    setEditingMaterial(material || {});
+    setIsMaterialDialogOpen(true);
+  };
+
+  const handleSaveMaterial = async () => {
+    if (!editingMaterial || !editingMaterial.sku || !editingMaterial.name) {
+      toast({ variant: 'destructive', title: 'Error', description: 'SKU and Name are required.' });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const { id, ...dataToSave } = editingMaterial;
+      if (id) {
+        await setDoc(doc(db, "materialsCatalog", id), dataToSave, { merge: true });
+        toast({ title: "Success", description: "Material updated." });
+      } else {
+        await setDoc(doc(db, "materialsCatalog", dataToSave.sku!), dataToSave, { merge: true });
+        toast({ title: "Success", description: "Material added." });
+      }
+      await fetchData();
+      setIsMaterialDialogOpen(false);
+      setEditingMaterial(null);
+    } catch (error) {
+      console.error("Error saving material:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not save material.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteMaterial = async (materialId: string) => {
+    setIsProcessing(true);
+    try {
+      await deleteDoc(doc(db, "materialsCatalog", materialId));
+      await fetchData();
+      toast({ title: "Success", description: "Material deleted." });
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete material.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (loading) {
     return (
       <AppLayout>
         <div className="flex justify-center items-center h-full">
-          <p>Loading admin data...</p>
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="ml-2">Loading admin data...</p>
         </div>
       </AppLayout>
     );
@@ -197,12 +322,50 @@ export default function AdminPage() {
                         <TableRow key={user.id}>
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.role}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(user.rate)}/hr</TableCell>
+                          <TableCell>
+                            <Select
+                                value={user.role}
+                                onValueChange={(value) => handleUpdateUser(user.id, 'role', value)}
+                            >
+                                <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Select a role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Worker">Worker</SelectItem>
+                                    <SelectItem value="Supervisor">Supervisor</SelectItem>
+                                    <SelectItem value="Admin">Admin</SelectItem>
+                                </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                                type="number"
+                                value={user.rate}
+                                onBlur={(e) => handleUpdateUser(user.id, 'rate', Number(e.target.value))}
+                                onChange={(e) => setUsers(users.map(u => u.id === user.id ? {...u, rate: Number(e.target.value)} : u))}
+                                className="w-24 ml-auto text-right"
+                            />
+                          </TableCell>
                           <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the user.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -216,7 +379,9 @@ export default function AdminPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                 <Button onClick={handleInviteUser}><PlusCircle className="mr-2 h-4 w-4"/> Invite User</Button>
+                 <Button onClick={() => setIsInviteUserOpen(true)} disabled={isProcessing}>
+                    <PlusCircle className="mr-2 h-4 w-4"/> Invite User
+                 </Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -241,7 +406,10 @@ export default function AdminPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button onClick={handleSaveRates}>Save Rates</Button>
+                <Button onClick={handleSaveRates} disabled={isProcessing}>
+                  {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save Rates
+                </Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -268,9 +436,23 @@ export default function AdminPage() {
                           <TableCell className="font-medium" onClick={() => handleTaskRowClick(task)}>{task.name}</TableCell>
                           <TableCell onClick={() => handleTaskRowClick(task)}>{task.defaultMaterials?.length ?? 0} items</TableCell>
                           <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteTaskType(task.id) }}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>This will permanently delete the task type.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteTaskType(task.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -285,7 +467,10 @@ export default function AdminPage() {
               </CardContent>
               <CardFooter className="gap-4">
                 <Input placeholder="New task type name..." value={newTaskTypeName} onChange={(e) => setNewTaskTypeName(e.target.value)} />
-                <Button onClick={handleAddTaskType}><PlusCircle className="mr-2 h-4 w-4"/> Add Task Type</Button>
+                <Button onClick={handleAddTaskType} disabled={isProcessing}>
+                    {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    <PlusCircle className="mr-2 h-4 w-4"/> Add Task Type
+                </Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -300,7 +485,7 @@ export default function AdminPage() {
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => toast({ title: "Import", description: "Import CSV clicked"})}><FileUp className="mr-2 h-4 w-4"/> Import CSV</Button>
                   <Button variant="outline" onClick={() => toast({ title: "Export", description: "Export CSV clicked"})}><FileDown className="mr-2 h-4 w-4"/> Export CSV</Button>
-                  <Button onClick={() => toast({ title: "Add Material", description: "Add new material clicked"})}><PlusCircle className="mr-2 h-4 w-4"/> Add New Material</Button>
+                  <Button onClick={() => openMaterialDialog()}><PlusCircle className="mr-2 h-4 w-4"/> Add New Material</Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -329,12 +514,28 @@ export default function AdminPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                             <Button variant="ghost" size="icon" onClick={() => toast({title: "Edit", description: `Edit ${material.name} clicked`})}>
+                             <Button variant="ghost" size="icon" onClick={() => openMaterialDialog(material)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => toast({title: "Delete", description: `Delete ${material.name} clicked`})}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the material.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteMaterial(material.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -352,6 +553,91 @@ export default function AdminPage() {
 
         </Tabs>
       </div>
+      
+      {/* --- Dialogs --- */}
+
+      <Dialog open={isInviteUserOpen} onOpenChange={setIsInviteUserOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Invite New User</DialogTitle>
+                <DialogDescription>
+                    Enter the new user's details. They will receive an email with a temporary password.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="email" className="text-right">Email</Label>
+                    <Input id="email" value={newInvite.email} onChange={(e) => setNewInvite({...newInvite, email: e.target.value})} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="role" className="text-right">Role</Label>
+                    <Select value={newInvite.role} onValueChange={(value) => setNewInvite({...newInvite, role: value as any})}>
+                        <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                             <SelectItem value="Worker">Worker</SelectItem>
+                             <SelectItem value="Supervisor">Supervisor</SelectItem>
+                             <SelectItem value="Admin">Admin</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="rate" className="text-right">Hourly Rate</Label>
+                    <Input id="rate" type="number" value={newInvite.hourlyRate} onChange={(e) => setNewInvite({...newInvite, hourlyRate: Number(e.target.value)})} className="col-span-3" />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsInviteUserOpen(false)}>Cancel</Button>
+                <Button onClick={handleInviteUser} disabled={isProcessing}>
+                    {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Send Invite
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isMaterialDialogOpen} onOpenChange={setIsMaterialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingMaterial?.id ? 'Edit Material' : 'Add New Material'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="sku" className="text-right">SKU</Label>
+              <Input id="sku" value={editingMaterial?.sku ?? ''} onChange={(e) => setEditingMaterial(prev => ({ ...prev, sku: e.target.value }))} className="col-span-3" disabled={!!editingMaterial?.id} />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">Name</Label>
+              <Input id="name" value={editingMaterial?.name ?? ''} onChange={(e) => setEditingMaterial(prev => ({ ...prev, name: e.target.value }))} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="unit" className="text-right">Unit</Label>
+              <Input id="unit" value={editingMaterial?.unit ?? ''} onChange={(e) => setEditingMaterial(prev => ({ ...prev, unit: e.target.value }))} className="col-span-3" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="cost" className="text-right">Unit Cost</Label>
+              <Input id="cost" type="number" value={editingMaterial?.cost ?? 0} onChange={(e) => setEditingMaterial(prev => ({ ...prev, cost: Number(e.target.value) }))} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">Description</Label>
+              <Input id="description" value={editingMaterial?.description ?? ''} onChange={(e) => setEditingMaterial(prev => ({ ...prev, description: e.target.value }))} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="is-active" className="text-right">Is Active</Label>
+              <Switch id="is-active" checked={editingMaterial?.isActive ?? true} onCheckedChange={(checked) => setEditingMaterial(prev => ({ ...prev, isActive: checked }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMaterialDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveMaterial} disabled={isProcessing}>
+              {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Material
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -426,12 +712,13 @@ export default function AdminPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveChanges}>Save Changes</Button>
+            <Button onClick={handleSaveChanges} disabled={isProcessing}>
+                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>
   )
 }
-
-    
