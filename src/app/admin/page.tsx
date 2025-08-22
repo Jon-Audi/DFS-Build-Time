@@ -33,13 +33,18 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PlusCircle, Trash2, FileUp, FileDown, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import type { TaskType, User, MaterialCatalogItem } from "@/lib/types"
+import type { TaskType, User, MaterialCatalogItem, OrganizationRates } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AdminPage() {
+  const { toast } = useToast()
   const [users, setUsers] = React.useState<User[]>([]);
   const [taskTypes, setTaskTypes] = React.useState<TaskType[]>([]);
   const [materials, setMaterials] = React.useState<MaterialCatalogItem[]>([]);
+  const [rates, setRates] = React.useState<OrganizationRates>({ defaultLaborRate: 0, defaultOverheadPct: 0 });
+  
+  const [newTaskTypeName, setNewTaskTypeName] = React.useState("");
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
   const [selectedTask, setSelectedTask] = React.useState<TaskType | null>(null)
@@ -48,6 +53,32 @@ export default function AdminPage() {
   const handleTaskRowClick = (task: TaskType) => {
     setSelectedTask(task)
     setIsTaskDialogOpen(true)
+  }
+  
+  const handleSaveChanges = () => {
+    toast({ title: "Success", description: "Changes saved successfully." })
+    setIsTaskDialogOpen(false)
+  }
+
+  const handleSaveRates = () => {
+    toast({ title: "Success", description: "Rates saved successfully." })
+  };
+  
+  const handleAddTaskType = () => {
+    if (!newTaskTypeName) {
+      toast({ variant: 'destructive', title: "Error", description: "Task type name cannot be empty." })
+      return;
+    }
+    toast({ title: "Success", description: `Task type "${newTaskTypeName}" added.` })
+    setNewTaskTypeName("");
+  }
+  
+  const handleInviteUser = () => {
+     toast({ title: "Invite Sent", description: "A user has been invited (placeholder)." })
+  }
+  
+  const handleDeleteUser = (userId: string) => {
+    toast({ title: "User Removed", description: `User ${userId} has been removed (placeholder).` })
   }
 
   return (
@@ -88,7 +119,7 @@ export default function AdminPage() {
                           <TableCell>{user.role}</TableCell>
                           <TableCell className="text-right">{formatCurrency(user.rate)}/hr</TableCell>
                           <TableCell className="text-center">
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>
@@ -104,7 +135,7 @@ export default function AdminPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                 <Button><PlusCircle className="mr-2 h-4 w-4"/> Invite User</Button>
+                 <Button onClick={handleInviteUser}><PlusCircle className="mr-2 h-4 w-4"/> Invite User</Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -119,17 +150,17 @@ export default function AdminPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="default-labor">Default Labor Rate ($/hr)</Label>
-                    <Input id="default-labor" type="number" placeholder="Enter rate" />
+                    <Input id="default-labor" type="number" placeholder="Enter rate" value={rates.defaultLaborRate} onChange={(e) => setRates(prev => ({...prev, defaultLaborRate: Number(e.target.value)}))} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="overhead-percentage">Default Overhead (%)</Label>
-                    <Input id="overhead-percentage" type="number" placeholder="Enter percentage" />
+                    <Input id="overhead-percentage" type="number" placeholder="Enter percentage" value={rates.defaultOverheadPct} onChange={(e) => setRates(prev => ({...prev, defaultOverheadPct: Number(e.target.value)}))} />
                     <p className="text-sm text-muted-foreground">Percentage added to jobs for overhead costs.</p>
                   </div>
                 </div>
               </CardContent>
               <CardFooter>
-                <Button>Save Rates</Button>
+                <Button onClick={handleSaveRates}>Save Rates</Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -156,7 +187,7 @@ export default function AdminPage() {
                           <TableCell className="font-medium">{task.name}</TableCell>
                           <TableCell>{task.defaultMaterials?.length ?? 0} items</TableCell>
                           <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); /* logic to delete */ }}>
+                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); toast({title: "Delete", description: "Delete action clicked"}) }}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>
@@ -172,8 +203,8 @@ export default function AdminPage() {
                 </div>
               </CardContent>
               <CardFooter className="gap-4">
-                <Input placeholder="New task type name..."/>
-                <Button><PlusCircle className="mr-2 h-4 w-4"/> Add Task Type</Button>
+                <Input placeholder="New task type name..." value={newTaskTypeName} onChange={(e) => setNewTaskTypeName(e.target.value)} />
+                <Button onClick={handleAddTaskType}><PlusCircle className="mr-2 h-4 w-4"/> Add Task Type</Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -186,9 +217,9 @@ export default function AdminPage() {
                   <CardDescription>Manage your inventory of fence materials.</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline"><FileUp className="mr-2 h-4 w-4"/> Import CSV</Button>
-                  <Button variant="outline"><FileDown className="mr-2 h-4 w-4"/> Export CSV</Button>
-                  <Button><PlusCircle className="mr-2 h-4 w-4"/> Add New Material</Button>
+                  <Button variant="outline" onClick={() => toast({ title: "Import", description: "Import CSV clicked"})}><FileUp className="mr-2 h-4 w-4"/> Import CSV</Button>
+                  <Button variant="outline" onClick={() => toast({ title: "Export", description: "Export CSV clicked"})}><FileDown className="mr-2 h-4 w-4"/> Export CSV</Button>
+                  <Button onClick={() => toast({ title: "Add Material", description: "Add new material clicked"})}><PlusCircle className="mr-2 h-4 w-4"/> Add New Material</Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -217,7 +248,7 @@ export default function AdminPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={() => toast({title: "Delete", description: `Delete ${material.name} clicked`})}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>
@@ -272,7 +303,7 @@ export default function AdminPage() {
                     <Label htmlFor="material-quantity" className="sr-only">Quantity</Label>
                     <Input id="material-quantity" type="number" placeholder="Qty" className="w-20" />
                  </div>
-                <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4"/>Add</Button>
+                <Button variant="outline" onClick={() => toast({ title: "Add Material", description: "Material added to task"})}><PlusCircle className="mr-2 h-4 w-4"/>Add</Button>
               </div>
 
               <div className="border rounded-lg max-h-60 overflow-y-auto">
@@ -292,7 +323,7 @@ export default function AdminPage() {
                            <TableCell className="font-medium">{material?.name ?? 'Unknown'}</TableCell>
                            <TableCell>{dm.quantity} {material?.unit}(s)</TableCell>
                            <TableCell className="text-right">
-                             <Button variant="ghost" size="icon">
+                             <Button variant="ghost" size="icon" onClick={() => toast({ title: "Remove Material", description: `Removed material from ${selectedTask?.name}`})}>
                                <X className="h-4 w-4 text-destructive" />
                              </Button>
                            </TableCell>
@@ -311,10 +342,12 @@ export default function AdminPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
-            <Button>Save Changes</Button>
+            <Button onClick={handleSaveChanges}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>
   )
 }
+
+    
