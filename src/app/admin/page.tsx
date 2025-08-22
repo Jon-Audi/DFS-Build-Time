@@ -2,6 +2,8 @@
 "use client"
 
 import * as React from "react"
+import { db } from "@/lib/firebase"
+import { collection, doc, getDocs, setDoc, addDoc, deleteDoc, updateDoc } from "firebase/firestore"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,7 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PlusCircle, Trash2, FileUp, FileDown, X } from "lucide-react"
+import { PlusCircle, Trash2, FileUp, FileDown, X, Edit } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { TaskType, User, MaterialCatalogItem, OrganizationRates } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -44,33 +46,101 @@ export default function AdminPage() {
   const [materials, setMaterials] = React.useState<MaterialCatalogItem[]>([]);
   const [rates, setRates] = React.useState<OrganizationRates>({ defaultLaborRate: 0, defaultOverheadPct: 0 });
   
-  const [newTaskTypeName, setNewTaskTypeName] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
 
-  const formatCurrency = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+  // States for forms/dialogs
+  const [newTaskTypeName, setNewTaskTypeName] = React.useState("");
   const [selectedTask, setSelectedTask] = React.useState<TaskType | null>(null)
   const [isTaskDialogOpen, setIsTaskDialogOpen] = React.useState(false)
 
+  // Fetch all data on component mount
+  React.useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+
+        const taskTypesSnapshot = await getDocs(collection(db, "taskTypes"));
+        setTaskTypes(taskTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TaskType)));
+        
+        const materialsSnapshot = await getDocs(collection(db, "materialsCatalog"));
+        setMaterials(materialsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaterialCatalogItem)));
+
+        const ratesDoc = await getDocs(collection(db, "rates"));
+        if (!ratesDoc.empty) {
+          setRates(ratesDoc.docs[0].data() as OrganizationRates);
+        }
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Failed to load data from Firestore." });
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, [toast]);
+
+
+  const formatCurrency = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0)
+  
   const handleTaskRowClick = (task: TaskType) => {
     setSelectedTask(task)
     setIsTaskDialogOpen(true)
   }
   
-  const handleSaveChanges = () => {
-    toast({ title: "Success", description: "Changes saved successfully." })
-    setIsTaskDialogOpen(false)
+  const handleSaveChanges = async () => {
+    if (!selectedTask) return;
+    try {
+      await updateDoc(doc(db, "taskTypes", selectedTask.id), {
+        name: selectedTask.name,
+        defaultMaterials: selectedTask.defaultMaterials || []
+      });
+      // Refresh local state
+      setTaskTypes(prev => prev.map(t => t.id === selectedTask.id ? selectedTask : t));
+      toast({ title: "Success", description: "Task type updated successfully." });
+      setIsTaskDialogOpen(false);
+    } catch(error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: "Error", description: "Failed to save changes." });
+    }
   }
 
-  const handleSaveRates = () => {
-    toast({ title: "Success", description: "Rates saved successfully." })
+  const handleSaveRates = async () => {
+    try {
+      await setDoc(doc(db, "rates", "default"), rates, { merge: true });
+      toast({ title: "Success", description: "Rates saved successfully." });
+    } catch (error) {
+      console.error("Error saving rates:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not save rates." });
+    }
   };
   
-  const handleAddTaskType = () => {
+  const handleAddTaskType = async () => {
     if (!newTaskTypeName) {
-      toast({ variant: 'destructive', title: "Error", description: "Task type name cannot be empty." })
+      toast({ variant: 'destructive', title: "Error", description: "Task type name cannot be empty." });
       return;
     }
-    toast({ title: "Success", description: `Task type "${newTaskTypeName}" added.` })
-    setNewTaskTypeName("");
+    try {
+      const docRef = await addDoc(collection(db, "taskTypes"), { name: newTaskTypeName, isActive: true });
+      setTaskTypes(prev => [...prev, { id: docRef.id, name: newTaskTypeName, isActive: true }]);
+      toast({ title: "Success", description: `Task type "${newTaskTypeName}" added.` });
+      setNewTaskTypeName("");
+    } catch (error) {
+      console.error("Error adding task type:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not add task type." });
+    }
+  }
+
+  const handleDeleteTaskType = async (taskId: string) => {
+    try {
+      await deleteDoc(doc(db, "taskTypes", taskId));
+      setTaskTypes(prev => prev.filter(t => t.id !== taskId));
+      toast({ title: "Success", description: "Task type deleted." });
+    } catch (error) {
+      console.error("Error deleting task type:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not delete task type." });
+    }
   }
   
   const handleInviteUser = () => {
@@ -79,6 +149,16 @@ export default function AdminPage() {
   
   const handleDeleteUser = (userId: string) => {
     toast({ title: "User Removed", description: `User ${userId} has been removed (placeholder).` })
+  }
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex justify-center items-center h-full">
+          <p>Loading admin data...</p>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -183,11 +263,11 @@ export default function AdminPage() {
                     </TableHeader>
                     <TableBody>
                       {taskTypes.map((task) => (
-                        <TableRow key={task.id} onClick={() => handleTaskRowClick(task)} className="cursor-pointer">
-                          <TableCell className="font-medium">{task.name}</TableCell>
-                          <TableCell>{task.defaultMaterials?.length ?? 0} items</TableCell>
+                        <TableRow key={task.id} className="cursor-pointer">
+                          <TableCell className="font-medium" onClick={() => handleTaskRowClick(task)}>{task.name}</TableCell>
+                          <TableCell onClick={() => handleTaskRowClick(task)}>{task.defaultMaterials?.length ?? 0} items</TableCell>
                           <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); toast({title: "Delete", description: "Delete action clicked"}) }}>
+                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteTaskType(task.id) }}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>
@@ -248,6 +328,9 @@ export default function AdminPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
+                             <Button variant="ghost" size="icon" onClick={() => toast({title: "Edit", description: `Edit ${material.name} clicked`})}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => toast({title: "Delete", description: `Delete ${material.name} clicked`})}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -294,7 +377,7 @@ export default function AdminPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {materials.map(m => (
-                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                          <SelectItem key={m.id} value={m.id}>{m.name} ({m.sku})</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -349,5 +432,3 @@ export default function AdminPage() {
     </AppLayout>
   )
 }
-
-    
