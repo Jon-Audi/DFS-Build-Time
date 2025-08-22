@@ -1,4 +1,5 @@
 
+
 export interface Job {
   id: string;
   name: string;
@@ -46,9 +47,10 @@ export interface MaterialCatalogItem {
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email: string; // Can be a synthetic email
   role: 'Admin' | 'Yard Staff' | 'Welder' | 'Supervisor' | 'Worker';
   rate: number; // hourly rate
+  isActive: boolean;
 }
 
 export interface TaskType {

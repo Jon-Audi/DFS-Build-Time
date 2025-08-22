@@ -1,3 +1,4 @@
+
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
@@ -195,23 +196,45 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
   if (req.auth?.token?.role !== "admin") {
     throw new HttpsError("permission-denied", "admin only");
   }
-  const { email, role } = req.data;
-  const tempPassword = req.data.tempPassword || Math.random().toString(36).slice(-10) + "A1!";
+  
+  const { name, role, hourlyRate } = req.data;
+  if (!name) {
+    throw new HttpsError("invalid-argument", "Name is required.");
+  }
 
-  const user = await admin.auth().createUser({
-    email,
-    password: tempPassword,
-    emailVerified: false,
-    disabled: false,
-  });
+  // Sanitize name for email creation
+  const sanitizedName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const syntheticEmail = `${sanitizedName}@pin.track-it-fencing.com`;
+  const tempPassword = Math.random().toString(36).slice(-8); // 8-char PIN
+
+  let user;
+  try {
+    user = await admin.auth().createUser({
+      email: syntheticEmail,
+      password: tempPassword,
+      emailVerified: true, // It's a synthetic email, so we can mark it as verified.
+      displayName: name,
+      disabled: false,
+    });
+  } catch (error: any) {
+    if (error.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', `A user with a similar name already exists. Please try a different name.`);
+    }
+    throw new HttpsError('internal', 'Failed to create user account.');
+  }
 
   await admin.auth().setCustomUserClaims(user.uid, { role });
 
   await db.doc(`users/${user.uid}`).set({
-    email, role, isActive: true, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    name,
+    email: syntheticEmail, // Store the synthetic email as their login ID
+    role,
+    rate: hourlyRate || 0,
+    isActive: true,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 
-  return { uid: user.uid, email, tempPassword };
+  return { uid: user.uid, email: syntheticEmail, tempPassword };
 });
 
 
@@ -219,6 +242,11 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
 export const enforceSignupDomain = beforeUserCreated({ region: REGION }, (event) => {
   const email = event.data.email || "";
   const domain = email.split("@")[1]?.toLowerCase() || "";
+  
+  // Allow synthetic PIN-based signups
+  if (domain === "pin.track-it-fencing.com") {
+      return;
+  }
 
   if (!ALLOWED_SIGNUP_DOMAIN) return; // disabled if empty
 

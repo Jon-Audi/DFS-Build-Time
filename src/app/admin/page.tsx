@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import * as React from "react"
@@ -71,7 +72,7 @@ export default function AdminPage() {
   // --- Form states ---
   const [newTaskTypeName, setNewTaskTypeName] = React.useState("");
   const [selectedTask, setSelectedTask] = React.useState<TaskType | null>(null)
-  const [newInvite, setNewInvite] = React.useState({ email: '', role: 'Worker', hourlyRate: 0 });
+  const [newInvite, setNewInvite] = React.useState({ name: '', role: 'Worker', hourlyRate: 0 });
   const [editingMaterial, setEditingMaterial] = React.useState<Partial<MaterialCatalogItem> | null>(null);
 
   const fetchData = React.useCallback(async () => {
@@ -175,8 +176,8 @@ export default function AdminPage() {
   }
   
   const handleInviteUser = async () => {
-    if (!newInvite.email || !newInvite.role) {
-      toast({ variant: "destructive", title: "Missing fields", description: "Please enter email and select a role." });
+    if (!newInvite.name || !newInvite.role) {
+      toast({ variant: "destructive", title: "Missing fields", description: "Please enter name and select a role." });
       return;
     }
     setIsProcessing(true);
@@ -186,11 +187,11 @@ export default function AdminPage() {
       console.log(result.data);
       toast({
         title: "User Invited",
-        description: `An invitation has been sent to ${newInvite.email}. Temporary password: ${(result.data as any).tempPassword}`
+        description: `An invitation has been created for ${newInvite.name}. Temporary PIN: ${(result.data as any).tempPassword}`
       });
       await fetchData();
       setIsInviteUserOpen(false);
-      setNewInvite({ email: '', role: 'Worker', hourlyRate: 0 });
+      setNewInvite({ name: '', role: 'Worker', hourlyRate: 0 });
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "Error", description: "Failed to invite user." });
@@ -311,7 +312,7 @@ export default function AdminPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
+                        <TableHead>Email / Login ID</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead className="text-right">Hourly Rate</TableHead>
                         <TableHead className="text-center">Actions</TableHead>
@@ -561,13 +562,13 @@ export default function AdminPage() {
             <DialogHeader>
                 <DialogTitle>Invite New User</DialogTitle>
                 <DialogDescription>
-                    Enter the new user's details. They will receive an email with a temporary password.
+                    Enter the new user's details. The system will generate a temporary PIN for them.
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="email" className="text-right">Email</Label>
-                    <Input id="email" value={newInvite.email} onChange={(e) => setNewInvite({...newInvite, email: e.target.value})} className="col-span-3" />
+                    <Label htmlFor="name" className="text-right">Full Name</Label>
+                    <Input id="name" value={newInvite.name} onChange={(e) => setNewInvite({...newInvite, name: e.target.value})} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="role" className="text-right">Role</Label>
@@ -591,7 +592,7 @@ export default function AdminPage() {
                 <Button variant="outline" onClick={() => setIsInviteUserOpen(false)}>Cancel</Button>
                 <Button onClick={handleInviteUser} disabled={isProcessing}>
                     {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Send Invite
+                    Create User
                 </Button>
             </DialogFooter>
         </DialogContent>
