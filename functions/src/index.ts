@@ -209,7 +209,7 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
   await admin.auth().setCustomUserClaims(user.uid, { role });
 
   await db.doc(`users/${user.uid}`).set({
-    name,
+    name: name || email,
     email,
     role,
     rate: hourlyRate || 0,
@@ -356,3 +356,5 @@ export const dailyAggregate = onSchedule({
     computedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 });
+
+    
