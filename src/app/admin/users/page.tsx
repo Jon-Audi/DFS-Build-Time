@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -123,14 +124,16 @@ export default function UsersPage() {
 
           if (field === 'role') {
             const setRoleClaimFn = httpsCallable(functions, 'setRoleClaim');
-            await setRoleClaimFn({ uid: userId, role: value });
+            // Pass rate along with the role update
+            const user = users.find(u => u.id === userId);
+            await setRoleClaimFn({ uid: userId, role: value, rate: user?.rate });
           }
           
           setUsers(users.map(u => u.id === userId ? { ...u, [field]: value } : u));
           toast({ title: 'User Updated', description: `User ${userId} has been updated.` });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error updating user:', error);
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user.' });
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user: ' + error.message });
           fetchData(); // Re-fetch to revert optimistic update on error
         }
     };
@@ -191,7 +194,13 @@ export default function UsersPage() {
                             <Input
                                 type="number"
                                 value={user.rate}
-                                onBlur={(e) => handleUpdateUser(user.id, 'rate', Number(e.target.value))}
+                                onBlur={async (e) => {
+                                    const newRate = Number(e.target.value);
+                                    await updateDoc(doc(db, 'users', user.id), { rate: newRate });
+                                    const setRoleClaimFn = httpsCallable(functions, 'setRoleClaim');
+                                    await setRoleClaimFn({ uid: user.id, role: user.role, rate: newRate });
+                                    toast({ title: 'User Updated', description: `Rate for ${user.name} updated.` });
+                                }}
                                 onChange={(e) => setUsers(users.map(u => u.id === user.id ? {...u, rate: Number(e.target.value)} : u))}
                                 className="w-24 ml-auto text-right"
                             />
