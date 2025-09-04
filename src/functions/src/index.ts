@@ -5,6 +5,10 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { beforeUserCreated } from "firebase-functions/v2/identity";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import * as cors from "cors";
+
+const corsHandler = cors({ origin: true });
+
 admin.initializeApp();
 
 const db = admin.firestore();
@@ -46,7 +50,7 @@ async function getEffectiveRates(userId?: string, taskTypeId?: string) {
   const taskType = taskTypeSnap?.exists ? taskTypeSnap.data()! : {};
 
   const hourlyRate =
-    Number((user as any).hourlyRate) ||
+    Number((user as any).rate) ||
     Number((taskType as any).defaultLaborRate) ||
     Number((rates as any).defaultLaborRate) ||
     0;
@@ -91,7 +95,13 @@ export const onMaterialWrite = onDocumentWritten({
   retry: false,
 }, async (event) => {
   const jobRef = event.data?.after.ref.parent.parent;
-  if(!jobRef) return;
+  if(!jobRef) {
+      if(event.data?.before.ref.parent.parent){
+          // Handle deletion
+          await recomputeJobTotals(event.data.before.ref.parent.parent);
+      }
+      return;
+  }
 
   // If deleting, recompute and exit
   if (!event.data?.after.exists) {
@@ -128,8 +138,14 @@ export const onSessionWrite = onDocumentWritten({
   document: "jobs/{jobId}/sessions/{sessionId}",
   retry: false,
 }, async (event) => {
-  const jobRef = event.data?.after.ref.parent.parent;
-  if(!jobRef) return;
+    const jobRef = event.data?.after.ref.parent.parent;
+    if(!jobRef) {
+      if(event.data?.before.ref.parent.parent){
+          // Handle deletion
+          await recomputeJobTotals(event.data.before.ref.parent.parent);
+      }
+      return;
+    }
   
   // If deleting, recompute and exit
   if (!event.data?.after.exists) {
@@ -188,7 +204,7 @@ export const onTaskTypeWrite = onDocumentWritten(
 
 
 // --- Callable: admin sets role + (optional) hourlyRate ---
-export const setRoleClaim = onCall({ region: REGION }, async (req) => {
+export const setRoleClaim = onCall({ region: REGION, cors: true }, async (req) => {
   // Require caller to be admin
   if (req.auth?.token?.role !== "admin") {
     throw new HttpsError("permission-denied", "admin only");
@@ -196,6 +212,7 @@ export const setRoleClaim = onCall({ region: REGION }, async (req) => {
   const { uid, role, rate } = req.data;
   await admin.auth().setCustomUserClaims(uid, { role });
 
+  // Only update the rate if it's provided as a number
   if (typeof rate === "number") {
     await db.doc(`users/${uid}`).set({ rate: rate }, { merge: true });
   }
@@ -204,50 +221,50 @@ export const setRoleClaim = onCall({ region: REGION }, async (req) => {
 });
 
 // --- Callable: invite a user (creates temp password) ---
-export const inviteUser = onCall({ region: REGION }, async (req) => {
-  if (req.auth?.token?.role !== "admin") {
-    throw new HttpsError("permission-denied", "Admin role required to invite users.");
-  }
-
-  const { email, role, hourlyRate, name } = req.data;
-
-  if (!email || !role) {
-    throw new HttpsError("invalid-argument", "Email and role are required.");
-  }
-
-  // Generate a secure temporary password on the server
-  const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
-
-  try {
-    const userRecord = await admin.auth().createUser({
-      email,
-      password: tempPassword,
-      emailVerified: false,
-      disabled: false,
-    });
-
-    await admin.auth().setCustomUserClaims(userRecord.uid, { role });
-
-    const userDoc = {
-        name: name || email.split('@')[0],
-        email,
-        role,
-        rate: Number(hourlyRate) || 0,
-        isActive: true,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    await db.doc(`users/${userRecord.uid}`).set(userDoc, { merge: true });
-
-    return { uid: userRecord.uid, email, tempPassword };
-
-  } catch (error: any) {
-    logger.error("Error inviting user:", error);
-    if (error.code === 'auth/email-already-exists') {
-        throw new HttpsError('already-exists', 'A user with this email already exists.');
+export const inviteUser = onCall({ region: REGION, cors: true }, async (req) => {
+    if (req.auth?.token?.role !== "admin") {
+      throw new HttpsError("permission-denied", "Admin role required to invite users.");
     }
-    throw new HttpsError("internal", `An unexpected error occurred. Please check the function logs. Message: ${error.message}`);
-  }
+  
+    const { email, role, hourlyRate, name } = req.data;
+  
+    if (!email || !role) {
+      throw new HttpsError("invalid-argument", "Email and role are required.");
+    }
+  
+    // Generate a secure temporary password on the server
+    const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
+  
+    try {
+      const userRecord = await admin.auth().createUser({
+        email,
+        password: tempPassword,
+        emailVerified: false,
+        disabled: false,
+      });
+  
+      await admin.auth().setCustomUserClaims(userRecord.uid, { role });
+  
+      const userDoc = {
+          name: name || email.split('@')[0],
+          email,
+          role,
+          rate: Number(hourlyRate) || 0,
+          isActive: true,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+  
+      await db.doc(`users/${userRecord.uid}`).set(userDoc, { merge: true });
+  
+      return { uid: userRecord.uid, email, tempPassword };
+  
+    } catch (error: any) {
+      logger.error("Error inviting user:", error);
+      if (error.code === 'auth/email-already-exists') {
+          throw new HttpsError('already-exists', 'A user with this email already exists.');
+      }
+      throw new HttpsError("internal", `An unexpected error occurred. Please check the function logs. Message: ${error.message}`);
+    }
 });
 
 
@@ -268,7 +285,7 @@ export const enforceSignupDomain = beforeUserCreated({ region: REGION }, (event)
 
 
 // --- Callable: CSV export (sessions or job cost summary) ---
-export const exportCSV = onCall({ region: REGION, timeoutSeconds: 540 }, async (req) => {
+export const exportCSV = onCall({ region: REGION, timeoutSeconds: 540, cors: true }, async (req) => {
     if (!req.auth) throw new HttpsError("unauthenticated", "unauthenticated");
 
     // Supervisors and admins only (exports are sensitive)
@@ -386,3 +403,5 @@ export const dailyAggregate = onSchedule({
     computedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 });
+
+    

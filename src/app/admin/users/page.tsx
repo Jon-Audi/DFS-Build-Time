@@ -125,8 +125,10 @@ export default function UsersPage() {
           if (field === 'role' || field === 'rate') {
             const setRoleClaimFn = httpsCallable(functions, 'setRoleClaim');
             const user = users.find(u => u.id === userId);
-            const updatedUser = { ...user, [field]: value };
-            await setRoleClaimFn({ uid: userId, role: updatedUser.role, rate: updatedUser.rate });
+            if (user) {
+                const updatedUser = { ...user, [field]: value };
+                await setRoleClaimFn({ uid: userId, role: updatedUser.role, rate: updatedUser.rate });
+            }
           }
           
           setUsers(users.map(u => u.id === userId ? { ...u, [field]: value } : u));
@@ -286,3 +288,5 @@ export default function UsersPage() {
     </AppLayout>
   )
 }
+
+    
