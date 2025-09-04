@@ -11,6 +11,7 @@ import {
   Package,
   Settings,
   Timer,
+  Users,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -35,6 +36,11 @@ const menuItems = [
     href: "/tracker",
     label: "Time Tracker",
     icon: Timer,
+  },
+    {
+    href: "/admin/users",
+    label: "Users",
+    icon: Users,
   },
   {
     href: "/materials",

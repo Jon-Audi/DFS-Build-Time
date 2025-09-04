@@ -1,124 +1,285 @@
-"use client";
-import { useEffect, useState } from "react";
-import { collection, getDocs, doc, setDoc } from "firebase/firestore";
-import { getFirebase, getRole, callable } from "@/lib/firebaseClient";
+"use client"
 
-type UserRow = { id: string; email: string; role?: string; hourlyRate?: number; isActive?: boolean };
+import * as React from "react"
+import { db, functions } from "@/lib/firebase"
+import { httpsCallable } from "firebase/functions"
+import { collection, doc, getDocs, setDoc, addDoc, deleteDoc, updateDoc } from "firebase/firestore"
+import { AppLayout } from "@/components/app-layout"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { PlusCircle, Trash2, Loader2 } from "lucide-react"
+import type { User } from "@/lib/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+
 
 export default function UsersPage() {
-  const { db } = getFirebase();
-  const [role, setRole] = useState<"admin"|"supervisor"|"worker"|"anon">("anon");
-  const [rows, setRows] = useState<UserRow[]>([]);
-  const [email, setEmail] = useState("");
-  const [newRole, setNewRole] = useState<"admin"|"supervisor"|"worker">("worker");
-  const [hourlyRate, setHourlyRate] = useState<number>(28);
+    const { toast } = useToast()
+    const [users, setUsers] = React.useState<User[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [isProcessing, setIsProcessing] = React.useState(false);
 
-  const inviteUser = callable<{email:string, role:"admin"|"supervisor"|"worker"}, {uid:string,email:string,tempPassword:string}>("inviteUser");
-  const setRoleClaim = callable<{uid:string, role:"admin"|"supervisor"|"worker", hourlyRate?:number}, {ok:true}>("setRoleClaim");
+    const [isInviteUserOpen, setIsInviteUserOpen] = React.useState(false)
+    const [newInvite, setNewInvite] = React.useState({ email: '', role: 'Worker', hourlyRate: 0, name: '' });
 
-  async function refresh() {
-    const snap = await getDocs(collection(db, "users"));
-    const list: UserRow[] = [];
-    snap.forEach(d => {
-      const data = d.data() as any;
-      list.push({ id: d.id, email: data.email, role: data.role, hourlyRate: data.hourlyRate, isActive: data.isActive });
-    });
-    setRows(list);
-  }
+    const fetchData = React.useCallback(async () => {
+        setLoading(true);
+        try {
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+        } catch (error) {
+        console.error("Error fetching users:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Failed to load users from Firestore." });
+        } finally {
+        setLoading(false);
+        }
+    }, [toast]);
 
-  useEffect(() => {
-    (async () => {
-      setRole(await getRole());
-      await refresh();
-    })();
-  }, [db]);
+    React.useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
-  if (role === "anon") return <div className="p-6">Please sign in.</div>;
-  if (role !== "admin") return <div className="p-6">Admins only.</div>;
+    const handleInviteUser = async () => {
+        if (!newInvite.email || !newInvite.role) {
+          toast({ variant: "destructive", title: "Missing fields", description: "Please enter email and select a role." });
+          return;
+        }
+        setIsProcessing(true);
+        try {
+          const inviteUserFn = httpsCallable(functions, 'inviteUser');
+          const result = await inviteUserFn(newInvite);
+          console.log(result.data);
+          toast({
+            title: "User Invited",
+            description: `An invitation has been sent to ${newInvite.email}. Temporary Password: ${(result.data as any).tempPassword}`
+          });
+          await fetchData();
+          setIsInviteUserOpen(false);
+          setNewInvite({ email: '', role: 'Worker', hourlyRate: 0, name: '' });
+        } catch (error: any) {
+          console.error(error);
+          toast({ variant: "destructive", title: "Error Inviting User", description: error.message });
+        } finally {
+          setIsProcessing(false);
+        }
+    }
+  
+    const handleDeleteUser = async (userId: string) => {
+        setIsProcessing(true);
+        try {
+          // In a real app, this would call a Cloud Function to delete the user from Auth and Firestore.
+          await deleteDoc(doc(db, "users", userId));
+          await fetchData();
+          toast({ title: "User Removed", description: `User ${userId} has been removed.` })
+        } catch (error) {
+          console.error(error);
+          toast({ variant: "destructive", title: "Error", description: "Could not delete user." });
+        } finally {
+          setIsProcessing(false);
+        }
+    }
 
-  async function doInvite() {
-    if (!email) return;
-    const res = await inviteUser({ email, role: newRole });
-    alert(`Invited ${res.data.email}\nTemp password: ${res.data.tempPassword}`);
-    setEmail("");
-    await refresh();
-  }
+    const handleUpdateUser = async (userId: string, field: keyof User, value: any) => {
+        try {
+          const userRef = doc(db, 'users', userId);
+          await updateDoc(userRef, { [field]: value });
 
-  async function saveHourly(uid: string, value: number) {
-    await setDoc(doc(db, "users", uid), { hourlyRate: Number(value) }, { merge: true });
-    await setRoleClaim({ uid, role: (rows.find(r=>r.id===uid)?.role as any) || "worker" });
-    await refresh();
-  }
+          if (field === 'role') {
+            const setRoleClaimFn = httpsCallable(functions, 'setRoleClaim');
+            await setRoleClaimFn({ uid: userId, role: value });
+          }
+          
+          setUsers(users.map(u => u.id === userId ? { ...u, [field]: value } : u));
+          toast({ title: 'User Updated', description: `User ${userId} has been updated.` });
+        } catch (error) {
+          console.error('Error updating user:', error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to update user.' });
+          fetchData(); // Re-fetch to revert optimistic update on error
+        }
+    };
 
-  async function saveRole(uid: string, role: "admin"|"supervisor"|"worker") {
-    await setDoc(doc(db, "users", uid), { role }, { merge: true });
-    await setRoleClaim({ uid, role });
-    await refresh();
-  }
-
+    if (loading) {
+        return (
+          <AppLayout>
+            <div className="flex justify-center items-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <p className="ml-2">Loading users...</p>
+            </div>
+          </AppLayout>
+        );
+    }
+  
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Users</h1>
+    <AppLayout>
+        <div className="space-y-6">
+            <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+             <Card className="shadow-lg mt-4">
+              <CardHeader>
+                <CardTitle>Users</CardTitle>
+                <CardDescription>Invite and manage users in your organization.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email / Login ID</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead className="text-right">Hourly Rate</TableHead>
+                        <TableHead className="text-center">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Select
+                                value={user.role}
+                                onValueChange={(value) => handleUpdateUser(user.id, 'role', value)}
+                            >
+                                <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Select a role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Worker">Worker</SelectItem>
+                                    <SelectItem value="Supervisor">Supervisor</SelectItem>
+                                    <SelectItem value="Admin">Admin</SelectItem>
+                                </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                                type="number"
+                                value={user.rate}
+                                onBlur={(e) => handleUpdateUser(user.id, 'rate', Number(e.target.value))}
+                                onChange={(e) => setUsers(users.map(u => u.id === user.id ? {...u, rate: Number(e.target.value)} : u))}
+                                className="w-24 ml-auto text-right"
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the user.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                        {users.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center h-24">No users found.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+              <CardFooter>
+                 <Button onClick={() => setIsInviteUserOpen(true)} disabled={isProcessing}>
+                    <PlusCircle className="mr-2 h-4 w-4"/> Invite User
+                 </Button>
+              </CardFooter>
+            </Card>
+        </div>
 
-      <div className="flex gap-2 items-end">
-        <div>
-          <label className="block text-sm">Email</label>
-          <input className="border rounded p-2" placeholder="newuser@delawarefencesolutions.com"
-            value={email} onChange={(e)=>setEmail(e.target.value)} />
-        </div>
-        <div>
-          <label className="block text-sm">Role</label>
-          <select className="border rounded p-2" value={newRole} onChange={(e)=>setNewRole(e.target.value as any)}>
-            <option value="worker">worker</option>
-            <option value="supervisor">supervisor</option>
-            <option value="admin">admin</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm">Hourly Rate</label>
-          <input type="number" className="border rounded p-2"
-            value={hourlyRate} onChange={(e)=>setHourlyRate(Number(e.target.value))} />
-        </div>
-        <button onClick={async ()=>{ await doInvite(); if (email) {
-          // if you want to set initial hourly rate immediately:
-          const snapshot = await getDocs(collection(db, "users"));
-          const created = snapshot.docs.find(d => (d.data() as any).email === email);
-          if (created) await setDoc(doc(db,"users",created.id), { hourlyRate }, { merge: true });
-        }}}
-          className="px-4 py-2 rounded bg-blue-700 text-white">Invite</button>
-      </div>
-
-      <table className="w-full border border-gray-300">
-        <thead>
-          <tr className="bg-gray-100 text-left">
-            <th className="p-2">Email</th>
-            <th className="p-2">Role</th>
-            <th className="p-2">Hourly Rate</th>
-            <th className="p-2">Active</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r=>(
-            <tr key={r.id} className="border-t">
-              <td className="p-2">{r.email}</td>
-              <td className="p-2">
-                <select className="border rounded p-1" value={r.role || "worker"}
-                  onChange={(e)=>saveRole(r.id, e.target.value as any)}>
-                  <option value="worker">worker</option>
-                  <option value="supervisor">supervisor</option>
-                  <option value="admin">admin</option>
-                </select>
-              </td>
-              <td className="p-2">
-                <input type="number" className="border rounded p-1 w-28"
-                  defaultValue={r.hourlyRate ?? 0}
-                  onBlur={(e)=>saveHourly(r.id, Number(e.target.value))}/>
-              </td>
-              <td className="p-2">{String(r.isActive ?? true)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+        <Dialog open={isInviteUserOpen} onOpenChange={setIsInviteUserOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Invite New User</DialogTitle>
+                    <DialogDescription>
+                        Enter the new user's email. The system will generate a temporary password.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">Name</Label>
+                        <Input id="name" value={newInvite.name} onChange={(e) => setNewInvite({...newInvite, name: e.target.value})} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="email" className="text-right">Email</Label>
+                        <Input id="email" type="email" value={newInvite.email} onChange={(e) => setNewInvite({...newInvite, email: e.target.value})} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="role" className="text-right">Role</Label>
+                        <Select value={newInvite.role} onValueChange={(value) => setNewInvite({...newInvite, role: value as any})}>
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Worker">Worker</SelectItem>
+                                <SelectItem value="Supervisor">Supervisor</SelectItem>
+                                <SelectItem value="Admin">Admin</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="rate" className="text-right">Hourly Rate</Label>
+                        <Input id="rate" type="number" value={newInvite.hourlyRate} onChange={(e) => setNewInvite({...newInvite, hourlyRate: Number(e.target.value)})} className="col-span-3" />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsInviteUserOpen(false)}>Cancel</Button>
+                    <Button onClick={handleInviteUser} disabled={isProcessing}>
+                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Send Invite
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    </AppLayout>
+  )
 }
