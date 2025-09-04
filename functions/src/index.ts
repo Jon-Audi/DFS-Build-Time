@@ -196,28 +196,42 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
   if (req.auth?.token?.role !== "admin") {
     throw new HttpsError("permission-denied", "admin only");
   }
+
   const { email, role, hourlyRate, name } = req.data;
+
+  if (!email || !role) {
+    throw new HttpsError("invalid-argument", "Email and role are required.");
+  }
+
   const tempPassword = req.data.tempPassword || Math.random().toString(36).slice(-10) + "A1!";
 
-  const user = await admin.auth().createUser({
-    email,
-    password: tempPassword,
-    emailVerified: false,
-    disabled: false,
-  });
+  try {
+    const user = await admin.auth().createUser({
+      email,
+      password: tempPassword,
+      emailVerified: false,
+      disabled: false,
+    });
 
-  await admin.auth().setCustomUserClaims(user.uid, { role });
+    await admin.auth().setCustomUserClaims(user.uid, { role });
 
-  await db.doc(`users/${user.uid}`).set({
-    name: name || email,
-    email,
-    role,
-    rate: hourlyRate || 0,
-    isActive: true,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+    await db.doc(`users/${user.uid}`).set({
+      name: name || email,
+      email,
+      role,
+      rate: Number(hourlyRate) || 0,
+      isActive: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
 
-  return { uid: user.uid, email, tempPassword };
+    return { uid: user.uid, email, tempPassword };
+  } catch (error: any) {
+    logger.error("Error inviting user:", error);
+    if (error.code === 'auth/email-already-exists') {
+        throw new HttpsError('already-exists', 'A user with this email already exists.');
+    }
+    throw new HttpsError("internal", "An unexpected error occurred while inviting the user.");
+  }
 });
 
 
@@ -356,5 +370,3 @@ export const dailyAggregate = onSchedule({
     computedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 });
-
-    

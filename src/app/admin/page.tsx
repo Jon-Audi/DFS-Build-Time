@@ -192,9 +192,9 @@ export default function AdminPage() {
       await fetchData();
       setIsInviteUserOpen(false);
       setNewInvite({ email: '', role: 'Worker', hourlyRate: 0, name: '' });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to invite user." });
+      toast({ variant: "destructive", title: "Error Inviting User", description: error.message });
     } finally {
       setIsProcessing(false);
     }
@@ -727,5 +727,3 @@ export default function AdminPage() {
     </AppLayout>
   )
 }
-
-    
