@@ -5,9 +5,6 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { beforeUserCreated } from "firebase-functions/v2/identity";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import * as cors from "cors";
-
-const corsHandler = cors({ origin: true });
 
 admin.initializeApp();
 
@@ -33,17 +30,13 @@ function round2(n: number) {
 }
 
 async function getEffectiveRates(userId?: string, taskTypeId?: string) {
-  const reads = [
+  const reads: Promise<admin.firestore.DocumentSnapshot>[] = [
     db.doc("rates/default").get(),
   ];
   if (userId) reads.push(db.doc(`users/${userId}`).get());
   if (taskTypeId) reads.push(db.doc(`taskTypes/${taskTypeId}`).get());
 
-  const [ratesSnap, userSnap, taskTypeSnap] = await Promise.all([
-    reads[0] as Promise<admin.firestore.DocumentSnapshot>,
-    reads[1] as Promise<admin.firestore.DocumentSnapshot | null> ?? Promise.resolve(null),
-    reads[2] as Promise<admin.firestore.DocumentSnapshot | null> ?? Promise.resolve(null),
-  ]);
+  const [ratesSnap, userSnap, taskTypeSnap] = await Promise.all(reads);
 
   const rates = ratesSnap.exists ? ratesSnap.data()! : {};
   const user = userSnap?.exists ? userSnap.data()! : {};
