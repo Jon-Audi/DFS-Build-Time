@@ -374,5 +374,3 @@ export const dailyAggregate = onSchedule({
     computedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 });
-
-    
