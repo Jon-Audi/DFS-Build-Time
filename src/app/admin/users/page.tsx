@@ -122,11 +122,11 @@ export default function UsersPage() {
           const userRef = doc(db, 'users', userId);
           await updateDoc(userRef, { [field]: value });
 
-          if (field === 'role') {
+          if (field === 'role' || field === 'rate') {
             const setRoleClaimFn = httpsCallable(functions, 'setRoleClaim');
-            // Pass rate along with the role update
             const user = users.find(u => u.id === userId);
-            await setRoleClaimFn({ uid: userId, role: value, rate: user?.rate });
+            const updatedUser = { ...user, [field]: value };
+            await setRoleClaimFn({ uid: userId, role: updatedUser.role, rate: updatedUser.rate });
           }
           
           setUsers(users.map(u => u.id === userId ? { ...u, [field]: value } : u));
@@ -194,13 +194,7 @@ export default function UsersPage() {
                             <Input
                                 type="number"
                                 value={user.rate}
-                                onBlur={async (e) => {
-                                    const newRate = Number(e.target.value);
-                                    await updateDoc(doc(db, 'users', user.id), { rate: newRate });
-                                    const setRoleClaimFn = httpsCallable(functions, 'setRoleClaim');
-                                    await setRoleClaimFn({ uid: user.id, role: user.role, rate: newRate });
-                                    toast({ title: 'User Updated', description: `Rate for ${user.name} updated.` });
-                                }}
+                                onBlur={(e) => handleUpdateUser(user.id, 'rate', Number(e.target.value))}
                                 onChange={(e) => setUsers(users.map(u => u.id === user.id ? {...u, rate: Number(e.target.value)} : u))}
                                 className="w-24 ml-auto text-right"
                             />
