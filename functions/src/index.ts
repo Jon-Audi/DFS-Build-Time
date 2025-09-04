@@ -185,7 +185,7 @@ export const setRoleClaim = onCall({ region: REGION }, async (req) => {
   await admin.auth().setCustomUserClaims(uid, { role });
 
   if (typeof hourlyRate === "number") {
-    await db.doc(`users/${uid}`).set({ hourlyRate }, { merge: true });
+    await db.doc(`users/${uid}`).set({ rate: hourlyRate }, { merge: true });
   }
   // Force token refresh recommended on client
   return { ok: true };
