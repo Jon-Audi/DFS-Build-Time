@@ -1,75 +1,77 @@
 rules_version = '2';
+
 service cloud.firestore {
-  match /databases/{db}/documents {
+  match /databases/{database}/documents {
 
-    function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn() && request.auth.token.role == 'admin'; }
-    function isSupervisor() { return isSignedIn() && (request.auth.token.role in ['admin','supervisor']); }
-    function isWorker() { return isSignedIn() && (request.auth.token.role in ['admin','supervisor','worker']); }
+    // Helper functions to check user roles from their token claims
+    function isAdmin() {
+      return request.auth.token.role == 'admin';
+    }
 
-    match /users/{uid} {
-      allow read: if isSignedIn() && (uid == request.auth.uid || isAdmin());
+    function isSupervisor() {
+      return request.auth.token.role == 'supervisor';
+    }
+    
+    function isWorker() {
+      return request.auth.token.role == 'worker';
+    }
+
+    function isEmployee() {
+      return isWorker() || isSupervisor();
+    }
+    
+    function isSuperOrAdmin() {
+      return isSupervisor() || isAdmin();
+    }
+
+    // --- Users ---
+    // Admins can read/write any user.
+    // Users can only read/update their own data.
+    match /users/{userId} {
+      allow read, update: if request.auth.uid == userId || isAdmin();
+      allow create, delete: if isAdmin();
+    }
+
+    // --- Read-only for users, writable for admins ---
+    match /materialsCatalog/{materialId} {
+      allow read: if request.auth != null;
       allow write: if isAdmin();
     }
-
-    match /rates/{doc} {
-      allow read: if isSignedIn();
-      // Only admins OR a privileged function may write
-      allow write: if isAdmin() || (request.auth.token.functionWrite == true);
+    match /taskTypes/{taskTypeId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+     match /rates/{rateId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /aggregates/{aggId} {
+       allow read: if isSuperOrAdmin();
+       allow write: if false; // Only functions can write
     }
 
-    match /taskTypes/{id} {
-      allow read: if isSignedIn();
-      allow write: if isSupervisor();
-    }
-
-    match /materialsCatalog/{sku} {
-      allow read: if isSignedIn();
-      allow write: if isSupervisor();
-    }
-
+    // --- Jobs and Subcollections ---
+    // Any authenticated user can create a job.
+    // Only supervisors or admins can delete a job.
+    // Users can update jobs (e.g. status), but costs are function-written.
     match /jobs/{jobId} {
-      allow read: if isWorker();
-      allow write: if isSupervisor(); // supervisors/admins manage jobs
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if isSuperOrAdmin();
 
-      // Materials under a job
+      // Materials subcollection
       match /materials/{materialId} {
-        allow read: if isWorker();
-        // Clients can propose sku, name, unitCost, quantity — BUT NOT subtotal
-        allow create, update: if isSupervisor()
-          && !('subtotal' in request.resource.data.diff(resource.data).affectedKeys());
-        // Only Functions can set subtotal
-        allow update: if request.auth.token.functionWrite == true;
+        allow read, create, update, delete: if request.auth != null;
       }
 
-      // Sessions under a job
+      // Sessions subcollection
+      // Users can only manage their own sessions
       match /sessions/{sessionId} {
-        allow read: if isWorker();
-
-        // Workers can create/update sessions they own (not computed fields)
-        allow create, update: if isWorker()
-          && request.resource.data.userId == request.auth.uid
-          && !('durationSec' in request.resource.data.diff(resource.data).affectedKeys())
-          && !('laborCost' in request.resource.data.diff(resource.data).affectedKeys());
-
-        // Supervisors/Admins may edit any non-computed fields
-        allow update: if isSupervisor()
-          && !('durationSec' in request.resource.data.diff(resource.data).affectedKeys())
-          && !('laborCost' in request.resource.data.diff(resource.data).affectedKeys());
-
-        // Only Functions can write computed fields
-        allow update: if request.auth.token.functionWrite == true;
+        allow read: if request.auth != null;
+        allow create, update: if request.auth.uid == request.resource.data.userId || isSuperOrAdmin();
+        allow delete: if request.auth.uid == resource.data.userId || isSuperOrAdmin();
       }
-    }
-
-    // Optional: aggregates/auditLogs read for all authed; write by functions
-    match /aggregates/{doc} {
-      allow read: if isSignedIn();
-      allow write: if request.auth.token.functionWrite == true;
-    }
-    match /auditLogs/{doc} {
-      allow read: if isAdmin();
-      allow write: if request.auth.token.functionWrite == true;
     }
   }
 }

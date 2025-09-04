@@ -90,9 +90,16 @@ export const onMaterialWrite = onDocumentWritten({
   document: "jobs/{jobId}/materials/{materialId}",
   retry: false,
 }, async (event) => {
-  const after = event.data?.after;
-  if (!after?.exists) return; // Deletion will trigger job recompute below
+  const jobRef = event.data?.after.ref.parent.parent;
+  if(!jobRef) return;
 
+  // If deleting, recompute and exit
+  if (!event.data?.after.exists) {
+    await recomputeJobTotals(jobRef);
+    return;
+  }
+  
+  const after = event.data.after;
   const data = after.data();
   const quantity = Number(data.quantity || 0);
   const unitCost = Number(data.unitCost || 0);
@@ -111,7 +118,6 @@ export const onMaterialWrite = onDocumentWritten({
   }
 
   // Recompute job totals
-  const jobRef = after.ref.parent.parent!;
   await recomputeJobTotals(jobRef);
 });
 
@@ -122,9 +128,16 @@ export const onSessionWrite = onDocumentWritten({
   document: "jobs/{jobId}/sessions/{sessionId}",
   retry: false,
 }, async (event) => {
-  const after = event.data?.after;
-  if (!after?.exists) return;
-
+  const jobRef = event.data?.after.ref.parent.parent;
+  if(!jobRef) return;
+  
+  // If deleting, recompute and exit
+  if (!event.data?.after.exists) {
+    await recomputeJobTotals(jobRef);
+    return;
+  }
+  
+  const after = event.data.after;
   const data = after.data();
   const startedAt = toDate(data.startedAt);
   const stoppedAt = toDate(data.stoppedAt);
@@ -155,7 +168,6 @@ export const onSessionWrite = onDocumentWritten({
   }
 
   // Recompute job totals after session change
-  const jobRef = after.ref.parent.parent!;
   await recomputeJobTotals(jobRef);
 });
 
