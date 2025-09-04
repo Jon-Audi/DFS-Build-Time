@@ -203,35 +203,38 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
     throw new HttpsError("invalid-argument", "Email and role are required.");
   }
 
-  const tempPassword = req.data.tempPassword || Math.random().toString(36).slice(-10) + "A1!";
+  // Generate a secure temporary password on the server
+  const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
 
   try {
     const userRecord = await admin.auth().createUser({
       email,
       password: tempPassword,
-      emailVerified: false, // Recommended to keep false until user logs in
+      emailVerified: false,
       disabled: false,
     });
 
     await admin.auth().setCustomUserClaims(userRecord.uid, { role });
 
-    await db.doc(`users/${userRecord.uid}`).set({
-      name: name || email.split('@')[0], // Default name to email prefix if not provided
-      email,
-      role,
-      rate: Number(hourlyRate) || 0, // Ensure rate is a number
-      isActive: true,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    const userDoc = {
+        name: name || email.split('@')[0],
+        email,
+        role,
+        rate: Number(hourlyRate) || 0,
+        isActive: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.doc(`users/${userRecord.uid}`).set(userDoc, { merge: true });
 
     return { uid: userRecord.uid, email, tempPassword };
+
   } catch (error: any) {
     logger.error("Error inviting user:", error);
     if (error.code === 'auth/email-already-exists') {
         throw new HttpsError('already-exists', 'A user with this email already exists.');
     }
-    // Provide a more detailed error message back to the client
-    throw new HttpsError("internal", `An unexpected error occurred: ${error.message}`);
+    throw new HttpsError("internal", `An unexpected error occurred. Please check the function logs. Message: ${error.message}`);
   }
 });
 
