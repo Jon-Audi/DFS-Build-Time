@@ -194,7 +194,7 @@ export const setRoleClaim = onCall({ region: REGION }, async (req) => {
 // --- Callable: invite a user (creates temp password) ---
 export const inviteUser = onCall({ region: REGION }, async (req) => {
   if (req.auth?.token?.role !== "admin") {
-    throw new HttpsError("permission-denied", "admin only");
+    throw new HttpsError("permission-denied", "Admin role required to invite users.");
   }
 
   const { email, role, hourlyRate, name } = req.data;
@@ -206,31 +206,32 @@ export const inviteUser = onCall({ region: REGION }, async (req) => {
   const tempPassword = req.data.tempPassword || Math.random().toString(36).slice(-10) + "A1!";
 
   try {
-    const user = await admin.auth().createUser({
+    const userRecord = await admin.auth().createUser({
       email,
       password: tempPassword,
-      emailVerified: false,
+      emailVerified: false, // Recommended to keep false until user logs in
       disabled: false,
     });
 
-    await admin.auth().setCustomUserClaims(user.uid, { role });
+    await admin.auth().setCustomUserClaims(userRecord.uid, { role });
 
-    await db.doc(`users/${user.uid}`).set({
-      name: name || email,
+    await db.doc(`users/${userRecord.uid}`).set({
+      name: name || email.split('@')[0], // Default name to email prefix if not provided
       email,
       role,
-      rate: Number(hourlyRate) || 0,
+      rate: Number(hourlyRate) || 0, // Ensure rate is a number
       isActive: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
-    return { uid: user.uid, email, tempPassword };
+    return { uid: userRecord.uid, email, tempPassword };
   } catch (error: any) {
     logger.error("Error inviting user:", error);
     if (error.code === 'auth/email-already-exists') {
         throw new HttpsError('already-exists', 'A user with this email already exists.');
     }
-    throw new HttpsError("internal", "An unexpected error occurred while inviting the user.");
+    // Provide a more detailed error message back to the client
+    throw new HttpsError("internal", `An unexpected error occurred: ${error.message}`);
   }
 });
 
@@ -370,3 +371,5 @@ export const dailyAggregate = onSchedule({
     computedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 });
+
+    
